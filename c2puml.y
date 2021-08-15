@@ -35,7 +35,7 @@ void pop_indent() { indent_level--; }
 
 
 %defines
-%token NUM IF FOR WHILE EXPR COMMENT ENDIF  END_OF_FILE ANY_OTHER ELSE FUNCTION ENDFUNCTION ENDIF_SINGLE ENDWHILE_SINGLE
+%token NUM IF FOR WHILE EXPR COMMENT ENDIF ENDWHILE END_OF_FILE ANY_OTHER ELSE FUNCTION ENDFUNCTION ENDIF_SINGLE ENDWHILE_SINGLE
 %type program block expr term factor ifst forst whilest comment endif any_other else functionst endfunction endif_s endwhile_s endwhile
 %left '+' '-'
 %left '*' '/'
@@ -122,7 +122,7 @@ endwhile:	ENDWHILE			{	pop_indent();
         ;
 
 endif_s	:	ENDIF_SINGLE			{	pop_indent();
-									char format_str[] = "%s%s\n%sendif\n";
+									char format_str[] = "%s:%s;\n%sendif\n";
 									char message_str[sizeof(format_str) + g_symbol_index];
 									sprintf( message_str, format_str, INDENT_STR, synbol_name, INDENT_STR );
 									output_to_file(message_str, sizeof(message_str));
@@ -130,7 +130,7 @@ endif_s	:	ENDIF_SINGLE			{	pop_indent();
         ;
 
 endwhile_s:	ENDWHILE_SINGLE			{	pop_indent();
-									char format_str[] = "%s%s\n%sendwhile\n";
+									char format_str[] = "%s:%s;\n%sendwhile\n";
 									char message_str[sizeof(format_str) + g_symbol_index];
 									sprintf( message_str, format_str, INDENT_STR, synbol_name, INDENT_STR );
 									output_to_file(message_str, sizeof(message_str));
