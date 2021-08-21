@@ -1,0 +1,58 @@
+@startuml
+:int main(int argc, char *argv[])
+{;
+start
+ 	:FILE * fptr_r = NULL;;
+ 	:FILE * fptr_w = NULL;;
+ 	:int i;;
+ 	:char opt;;
+ 	:char output_filne_name[C_OUTPUT_FILE_MAX] = {0};;
+ 	:char input_filne_name[C_OUTPUT_FILE_MAX] = {0};;
+ 	note right
+	/* default name. */
+	end note
+ 	:strncpy(output_filne_name, "out.puml", C_OUTPUT_FILE_MAX);;
+ 	while (for(i = 0; i < argc; ++i){)
+ 		if (if(*argv[i] == '-'){) then (true)
+ 			:opt = *(argv[i]+1);;
+ 			if (switch(opt){) then (true)
+ 			elseif (case 'o':) then (true)
+ 				:strncpy(output_filne_name, argv[i+1], C_OUTPUT_FILE_MAX);;
+ 				:break;;
+ 			else
+ 				:printf("Undefined Option.\n");;
+ 				:break;;
+ 			endif
+ 			:i++;;
+ 		else
+ 			:sprintf(input_filne_name, "./%s", argv[i]);;
+ 		endif
+ 	endwhile
+ 	note right
+	/* Read file pointer */
+	end note
+ 	if (if ((fptr_r = fopen(input_filne_name, "r"))==NULL) {) then (true)
+ 		:printf("file open failed.\n");;
+ 		:exit(1);;
+ 	endif
+ 	note right
+	/* write file pointer */
+	end note
+ 	if (if ((fptr_w = fopen(output_filne_name, "w"))==NULL) {) then (true)
+ 		:printf("output file open failed.\n");;
+ 		:exit(1);;
+ 	endif
+ 	note right
+	/* \•¶‰ðÍŠÖ” yyparse */
+	end note
+ 	:yyin = fptr_r;;
+ 	:output_file_ptr = fptr_w;;
+ 	if (if( yyparse() != 0 ){) then (true)
+ 		:printf("parse error.\n");;
+ 	endif
+ 	:fclose(fptr_r);;
+ 	:fclose(fptr_w);;
+ 	:return 0;;
+ stop
+@enduml
+ 

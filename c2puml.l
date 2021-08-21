@@ -31,6 +31,21 @@ enum {
 	C_WITH_BLOCK,
 	C_WITHOUT_BLOCK,
 };
+
+void remove_char(char target, char converted_char, const char* in_str, int in_length, char* out_str, int *out_length){
+	sprintf(out_str, "%s", in_str);
+	for(int i=0;i<in_length;i++){
+		if( out_str[i] == target ){
+			out_str[i] = converted_char;
+		}
+	}
+	*out_length = strlen(out_str);
+}
+void remove_line_feed(const char* in_str, int in_length, char* out_str, int *out_length){
+	remove_char('\n', '\0', in_str, in_length, out_str, out_length);
+	remove_char('\r', '\0', in_str, in_length, out_str, out_length);
+}
+
 int is_block_of_for = C_UNRELATED_WHILE;
 #define process_for_block(__with_block)	({																	\
 								printf("for(s):        (%s) len=%d g_bracket_cnt = %d\n", yytext, yyleng, g_bracket_cnt);						\
@@ -45,6 +60,16 @@ int is_block_of_for = C_UNRELATED_WHILE;
 									yymore();                                                               \
 								}																			\
 							})
+
+#define process_elseif_block()	({																\
+								char buf[yyleng+1];														\
+								int buf_leng = yyleng;													\
+								remove_line_feed(yytext, yyleng, buf, &buf_leng);						\
+								printf("else if(s):        (%s) len=%d \n", buf, buf_leng);					\
+								BEGIN(INITIAL); push_synbol_string(buf, buf_leng);						\
+								return(ELSE_IF);																\
+							})
+
 
 /* ブロック情報保持スタック */
 typedef enum {
@@ -63,11 +88,11 @@ typedef enum {
 t_blocktype block_stack[MAX_OF_BLOCK_STACK] = {C_BLOCK_TYPE_NONE};
 int block_stack_index = 0;
 
-inline void push_block_stack(t_blocktype stc)	{
+void push_block_stack(t_blocktype stc)	{
 		printf("*************************** [push] blockstack[%d->%d]=%d\n", block_stack_index, block_stack_index+1, stc);
 		block_stack[++	block_stack_index] = stc;
 	}
-inline t_blocktype pop_block_stack()	{
+t_blocktype pop_block_stack()	{
 	printf("*************************** [pop] blockstack[%d->%d]=%d\n", block_stack_index, block_stack_index-1, block_stack[block_stack_index]);
 	if(block_stack_index==0){ return C_BLOCK_TYPE_WRONG; }
 	return block_stack[block_stack_index--];
@@ -75,7 +100,7 @@ inline t_blocktype pop_block_stack()	{
 
 %}
 
-white       [\s\t]
+white       [ |\t|\r|\n]
 floating    [0-9]+\.[0-9]+
 integer     [0-9]+
 symbol      [=+\-\^*/();\n]
@@ -109,29 +134,33 @@ NAMESPACE       namespace|using
 TYPEID          typeid
 
 %%
+
 {white}+
-{C_KEYWORDS}+[ |\t]+{letter}+\(.+\)[ |\t]+\{	{	printf("start function:%s\n", yytext);
+
+{C_KEYWORDS}+{white}+{letter}+{white}*\(.+\){white}*\{	{	printf("start function:%s\n", yytext);
 												push_synbol_string(yytext, yyleng);
 												push_block_stack(C_BLOCK_TYPE_FUNCTION);
 												return(FUNCTION);
 											}
 
-if[\s\t]*\(				{ 	printf("start if                           g_bracket_cnt=%d\n", g_bracket_cnt); BEGIN(ST_IF_EXPR); yymore(); g_bracket_cnt++; }
+#.+[\r\n]
+
+if{white}*\(				{ 	printf("start if                           g_bracket_cnt=%d\n", g_bracket_cnt); BEGIN(ST_IF_EXPR); yymore(); g_bracket_cnt++; }
 <ST_IF_EXPR>\(			{	g_bracket_cnt++; printf("if bracket                      cnt=%d", g_bracket_cnt); yymore(); }
-<ST_IF_EXPR>\)[\s\t]*\{	{	printf("if block\n"); push_block_stack(C_BLOCK_TYPE_IF); process_if_block(C_WITH_ELSE_BLOCK); }
+<ST_IF_EXPR>\){white}*\{	{	printf("if block\n"); push_block_stack(C_BLOCK_TYPE_IF); process_if_block(C_WITH_ELSE_BLOCK); }
 <ST_IF_EXPR>\)   		{	printf("if single\n"); process_if_block(C_WITH_ELSE_SINGLE);	}
-<ST_IF_EXPR>\)[\s\t]*else	{	printf("if single with else\n"); process_if_block(C_WITH_ELSE_SINGLE);	}
+<ST_IF_EXPR>\){white}*else	{	printf("if single with else\n"); process_if_block(C_WITH_ELSE_SINGLE);	}
 <ST_IF_EXPR>.  			{	yymore(); }
 
-for[\s\t]*\(			{ 	printf("start for                          g_bracket_cnt=%d\n", g_bracket_cnt); BEGIN(ST_FOR_EXPR); yymore(); g_bracket_cnt++; }
+for{white}*\(			{ 	printf("start for                          g_bracket_cnt=%d\n", g_bracket_cnt); BEGIN(ST_FOR_EXPR); yymore(); g_bracket_cnt++; }
 <ST_FOR_EXPR>\(			{	g_bracket_cnt++; printf("for                          bracket cnt=%d", g_bracket_cnt); yymore(); }
-<ST_FOR_EXPR>\)[ |\t]*\{	{	printf("for block\n"); push_block_stack(C_BLOCK_TYPE_FOR); process_for_block(C_WITH_BLOCK); }
+<ST_FOR_EXPR>\){white}*\{	{	printf("for block\n"); push_block_stack(C_BLOCK_TYPE_FOR); process_for_block(C_WITH_BLOCK); }
 <ST_FOR_EXPR>\)   		{	printf("for single\n"); process_for_block(C_WITHOUT_BLOCK);	}
 <ST_FOR_EXPR>.  			{	yymore(); }
 
-while[\s\t]*\(			{ 	printf("start for                     g_bracket_cnt=%d\n", g_bracket_cnt); BEGIN(ST_WHILE_EXPR); yymore(); g_bracket_cnt++; }
+while{white}*\(			{ 	printf("start for                     g_bracket_cnt=%d\n", g_bracket_cnt); BEGIN(ST_WHILE_EXPR); yymore(); g_bracket_cnt++; }
 <ST_WHILE_EXPR>\(			{	g_bracket_cnt++; printf("while bracket                      cnt=%d", g_bracket_cnt); yymore(); }
-<ST_WHILE_EXPR>\)[\s\t]*\{	{	printf("while block\n"); push_block_stack(C_BLOCK_TYPE_WHILE); process_for_block(C_WITH_BLOCK); }
+<ST_WHILE_EXPR>\){white}*\{	{	printf("while block\n"); push_block_stack(C_BLOCK_TYPE_WHILE); process_for_block(C_WITH_BLOCK); }
 <ST_WHILE_EXPR>\)   		{	printf("while single\n"); process_for_block(C_WITHOUT_BLOCK);	}
 <ST_WHILE_EXPR>.  			{	yymore(); }
 
@@ -145,12 +174,30 @@ while[\s\t]*\(			{ 	printf("start for                     g_bracket_cnt=%d\n", g
 <ST_LINE_COMMENT><<EOF>>		{	printf("Comment(s):        (%s) len=%d\n", yytext, yyleng); BEGIN(INITIAL); push_synbol_string(yytext, yyleng); return(COMMENT); }
 <ST_LINE_COMMENT>[^*]+  		{	yymore(); }
 
-\}[ ]*else[ ]*\{		{ 	printf("start else block\n");
+\}[ \t]*else[ \t]*\{		{ 	printf("start else block\n");
 							pop_block_stack();
 							push_block_stack(C_BLOCK_TYPE_ELSE);
 							printf("else(s):        (%s) len=%d\n", yytext, yyleng); 
 							push_synbol_string("else", sizeof("else"));
 							yymore();
+							return(ELSE); }
+
+\}[ \t]*else[ \t]+if[ \t]*\(.*\)[ \t]*\{		{	printf("Start else if block\n");
+						pop_block_stack();
+						push_block_stack(C_BLOCK_TYPE_ELSE);
+						process_elseif_block();
+						}
+
+switch{white}*\(.+\){white}*\{		{	printf("Start switch case block\n"); push_block_stack(C_BLOCK_TYPE_IF); g_bracket_cnt++; process_if_block(C_WITH_ELSE_BLOCK); }
+case{white}+.+:			{	printf("Start switch case in Case block\n");
+							pop_block_stack();
+							push_block_stack(C_BLOCK_TYPE_ELSE);
+							process_elseif_block();
+						}
+default{white}*:			{ 	printf("Start switch case in default block\n");
+							pop_block_stack();
+							push_block_stack(C_BLOCK_TYPE_ELSE);
+							push_synbol_string("else", sizeof("else"));
 							return(ELSE); }
 
 \}   					{
@@ -197,23 +244,44 @@ while[\s\t]*\(			{ 	printf("start for                     g_bracket_cnt=%d\n", g
 <<EOF>>			{ printf("end of file\n"); return(END_OF_FILE); }
 
 %%
+
+#define C_OUTPUT_FILE_MAX    (256)
 int main(int argc, char *argv[])
 {
     FILE * fptr_r = NULL;
     FILE * fptr_w = NULL;
-    /* Read file pointer */
-    if(argc!=2){
-        printf("usage: c2puml [C source file name] \n");
-        exit(1);
-    }
+    int i;
+    char opt;
+    char output_filne_name[C_OUTPUT_FILE_MAX] = {0};
+    char input_filne_name[C_OUTPUT_FILE_MAX] = {0};
 
-    if ((fptr_r = fopen(argv[1], "r"))==NULL) {
+    /* default name. */
+    strncpy(output_filne_name, "out.puml", C_OUTPUT_FILE_MAX);
+
+    for(i = 0; i < argc; ++i){
+        if(*argv[i] == '-'){
+            opt = *(argv[i]+1);
+            switch(opt){
+                case 'o':
+                    strncpy(output_filne_name, argv[i+1], C_OUTPUT_FILE_MAX);
+                    break;
+                default:
+                    printf("Undefined Option.\n");
+                    break;
+            }
+            i++;
+        } else {
+            sprintf(input_filne_name, "./%s", argv[i]);
+        }
+    }
+    /* Read file pointer */
+    if ((fptr_r = fopen(input_filne_name, "r"))==NULL) {
         printf("file open failed.\n");
         exit(1);
     }
     
     /* write file pointer */
-    if ((fptr_w = fopen("./out.puml", "w"))==NULL) {
+    if ((fptr_w = fopen(output_filne_name, "w"))==NULL) {
         printf("output file open failed.\n");
         exit(1);
     }
