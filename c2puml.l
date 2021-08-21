@@ -16,8 +16,11 @@ int is_else_in_if = C_UNRELATED_ELSE;
 								printf("if(s):        (%s) len=%d g_bracket_cnt = %d\n", yytext, yyleng, g_bracket_cnt);						\
 								g_bracket_cnt--;															\
 								if(g_bracket_cnt == 0) {													\
+									char buf[yyleng+1];														\
+									int buf_leng = yyleng;													\
 									printf("bracket closed\n");												\
-									BEGIN(INITIAL); push_synbol_string(yytext, yyleng);						\
+									remove_line_feed(yytext, yyleng, buf, &buf_leng);						\
+									BEGIN(INITIAL); push_synbol_string(buf, buf_leng);						\
 									is_else_in_if = __with_else;											\
 									return(IF);																\
 								} else {                                                                    \
@@ -32,18 +35,17 @@ enum {
 	C_WITHOUT_BLOCK,
 };
 
-void remove_char(char target, char converted_char, const char* in_str, int in_length, char* out_str, int *out_length){
-	sprintf(out_str, "%s", in_str);
+void remove_char(char target, char converted_char, char* in_str, int in_length){
 	for(int i=0;i<in_length;i++){
-		if( out_str[i] == target ){
-			out_str[i] = converted_char;
+		if( in_str[i] == target ){
+			in_str[i] = converted_char;
 		}
 	}
-	*out_length = strlen(out_str);
 }
 void remove_line_feed(const char* in_str, int in_length, char* out_str, int *out_length){
-	remove_char('\n', '\0', in_str, in_length, out_str, out_length);
-	remove_char('\r', '\0', in_str, in_length, out_str, out_length);
+	sprintf(out_str, "%s", in_str);
+	remove_char('\n', ' ', out_str, in_length);
+	remove_char('\r', ' ', out_str, in_length);
 }
 
 int is_block_of_for = C_UNRELATED_WHILE;
@@ -51,8 +53,11 @@ int is_block_of_for = C_UNRELATED_WHILE;
 								printf("for(s):        (%s) len=%d g_bracket_cnt = %d\n", yytext, yyleng, g_bracket_cnt);						\
 								g_bracket_cnt--;															\
 								if(g_bracket_cnt == 0) {													\
+									char buf[yyleng+1];														\
+									int buf_leng = yyleng;													\
 									printf("bracket closed\n");												\
-									BEGIN(INITIAL); push_synbol_string(yytext, yyleng);						\
+									remove_line_feed(yytext, yyleng, buf, &buf_leng);						\
+									BEGIN(INITIAL); push_synbol_string(buf, buf_leng);						\
 									is_block_of_for = __with_block;											\
 									return(FOR);															\
 								} else {                                                                    \
@@ -137,10 +142,18 @@ TYPEID          typeid
 
 {white}+
 
-{C_KEYWORDS}+{white}+{letter}+{white}*\(.+\){white}*\{	{	printf("start function:%s\n", yytext);
-												push_synbol_string(yytext, yyleng);
-												push_block_stack(C_BLOCK_TYPE_FUNCTION);
-												return(FUNCTION);
+{C_KEYWORDS}*{white}*{letter}+{white}*\(.*\){white}*\{	{
+												char buf[yyleng+1];
+												int buf_leng = yyleng;
+												if(block_stack_index!=0) {
+													REJECT;
+												} else {
+													remove_line_feed(yytext, yyleng, buf, &buf_leng);
+													printf("start function:%s\n", buf);
+													push_synbol_string(buf, buf_leng);
+													push_block_stack(C_BLOCK_TYPE_FUNCTION);
+													return(FUNCTION);
+												}
 											}
 
 #.+[\r\n]
@@ -169,12 +182,9 @@ while{white}*\(			{ 	printf("start for                     g_bracket_cnt=%d\n", 
 <ST_COMMENT>"*"    		{	yymore(); }
 <ST_COMMENT>[^*]+  		{	yymore(); }
 
-"//"            		{	BEGIN(ST_LINE_COMMENT); yymore();	}
-<ST_LINE_COMMENT>(\r|\n)		{	printf("Comment(s):        (%s) len=%d\n", yytext, yyleng); BEGIN(INITIAL); push_synbol_string(yytext, yyleng); return(COMMENT); }
-<ST_LINE_COMMENT><<EOF>>		{	printf("Comment(s):        (%s) len=%d\n", yytext, yyleng); BEGIN(INITIAL); push_synbol_string(yytext, yyleng); return(COMMENT); }
-<ST_LINE_COMMENT>[^*]+  		{	yymore(); }
+"//".*(\r|\n)            		{	printf("Comment(s):        (%s) len=%d\n", yytext, yyleng); push_synbol_string(yytext, yyleng); return(COMMENT); }
 
-\}[ \t]*else[ \t]*\{		{ 	printf("start else block\n");
+\}{white}*else{white}*\{		{ 	printf("start else block\n");
 							pop_block_stack();
 							push_block_stack(C_BLOCK_TYPE_ELSE);
 							printf("else(s):        (%s) len=%d\n", yytext, yyleng); 
@@ -182,7 +192,7 @@ while{white}*\(			{ 	printf("start for                     g_bracket_cnt=%d\n", 
 							yymore();
 							return(ELSE); }
 
-\}[ \t]*else[ \t]+if[ \t]*\(.*\)[ \t]*\{		{	printf("Start else if block\n");
+\}{white}*else{white}+if{white}*\(.*\){white}*\{		{	printf("Start else if block\n");
 						pop_block_stack();
 						push_block_stack(C_BLOCK_TYPE_ELSE);
 						process_elseif_block();
@@ -234,8 +244,12 @@ default{white}*:			{ 	printf("Start switch case in default block\n");
 					if(is_block_of_for==C_WITHOUT_BLOCK) { is_block_of_for=C_UNRELATED_WHILE; return(ENDWHILE_SINGLE); }
 					if(is_else_in_if==C_WITH_ELSE_SINGLE) { is_block_of_for=C_UNRELATED_WHILE; return(ENDIF_SINGLE); }
 					return(ANY_OTHER); }
-<ST_ANY_OTHER>;[ ]*else	{	printf("any other(s):        (%s) len=%d is_else_in_if=%d\n", yytext, yyleng, is_else_in_if);
+<ST_ANY_OTHER>;[ ]*else	{
+					char buf[yyleng+1];
+					int buf_leng = yyleng;
+					printf("any other(s):        (%s) len=%d is_else_in_if=%d\n", yytext, yyleng, is_else_in_if);
 					BEGIN(INITIAL); 
+					remove_line_feed(yytext, yyleng, buf, &buf_leng);
 					push_synbol_string(yytext, yyleng); 
 					if(is_else_in_if==C_WITH_ELSE_SINGLE) {  return(ENDIF_SINGLE); }
 					return(ANY_OTHER); }
@@ -276,7 +290,7 @@ int main(int argc, char *argv[])
             }
             i++;
         } else {
-            sprintf(input_filne_name, "./%s", argv[i]);
+            sprintf(input_filne_name, "%s", argv[i]);
         }
     }
     /* Read file pointer */

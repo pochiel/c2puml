@@ -46,6 +46,11 @@ void pop_indent() {
 				printf("*** [ERROR] Wrong Indent Level Pop!! ***");			
 			}
 }
+
+int is_in_function(){
+	return (indent_level>0);
+}
+
 /******************************/
 /* コメント一行下げがらみ処理 */
 /******************************/
@@ -84,7 +89,7 @@ void output_all_comment(){
 	while(node != NULL){
 		temp_node = node;
 		node = node->next;
-		printf("***************************************************** msg:%s\n", temp_node->msg);
+		printf("output comment msg:%s\n", temp_node->msg);
 		output_to_file(temp_node->msg, temp_node->size);
 		/* メモリ領域を解放 */
 		free(temp_node->msg);
@@ -274,7 +279,7 @@ any_other	:	ANY_OTHER		{ 	char comment_format_str[] = "%s:%s;\n";
 %%
 
 void output_to_file(char * smbl, int size){
-	fprintf(output_file_ptr, "%s ", smbl); // ファイルに書く
+		fprintf(output_file_ptr, "%s ", smbl); // ファイルに書く
 }
 
 void push_synbol_string(char * smbl, int size){
