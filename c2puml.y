@@ -1,20 +1,30 @@
 %{
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 void output_to_file(char * smbl, int size);
 void clear_synbol_string();
 
+/* defineマクロ */
 #define C_MAX_SYNBOL_NAME	(1024)
-char synbol_name[C_MAX_SYNBOL_NAME];
-int g_symbol_index = 0;
-FILE * output_file_ptr = NULL;
-#define YYSTYPE double
 
+
+/* グローバル変数 */
+int g_symbol_index = 0;
+char synbol_name[C_MAX_SYNBOL_NAME];
+FILE * output_file_ptr = NULL;
+
+/* グローバル変数（オプション引数） */
+int is_comment_locate_after = 1;			/* コメントの挿入位置を1行遅らせる */
+
+/* プロトタイプ宣言 */
 void yyerror(const char* s);
 int  yylex(void);
 
-/* indent成形がらみ */
+/******************************/
+/* indent整形がらみ処理       */
+/******************************/
 int indent_level = 0;
 #define C_INDENT_MAX	(128)
 char indent_head[C_INDENT_MAX] = "";
@@ -36,12 +46,55 @@ void pop_indent() {
 				printf("*** [ERROR] Wrong Indent Level Pop!! ***");			
 			}
 }
+/******************************/
+/* コメント一行下げがらみ処理 */
+/******************************/
+typedef struct __t_comment_list {
+	char* msg;
+	int size;
+	struct __t_comment_list * next;
+} t_comment_list;
 
-/* オプション指定絡み */
-int is_comment_locate_after = 0;
+t_comment_list * g_first_comment_node = NULL;
+void backup_comment_message(char* msg_ptr, int len){
+	t_comment_list * node = g_first_comment_node;
+	/* 末尾が見つかるまでリストをたどる */
+	while(node != NULL){
+		if(node->next == NULL) break;
+		node = node->next;
+	}
+	/* 新しいノードを生成し、登録 */
+	if(node == NULL){
+		g_first_comment_node = malloc(sizeof(t_comment_list));
+		node = g_first_comment_node;
+	} else {
+		node->next = malloc(sizeof(t_comment_list));
+	}
+	node->msg = malloc(len + 1);
+	strncpy(node->msg, msg_ptr, (len));
+	node->size = len;
+	node->next = NULL;
+}
+
+void output_all_comment(){
+	t_comment_list * node = g_first_comment_node;
+	t_comment_list * temp_node = g_first_comment_node;
+	printf("start output_all_comment\n");
+	/* 末尾が見つかるまでリストをたどりつつ、ファイルにアウトプットする */
+	while(node != NULL){
+		temp_node = node;
+		node = node->next;
+		printf("***************************************************** msg:%s\n", temp_node->msg);
+		output_to_file(temp_node->msg, temp_node->size);
+		/* メモリ領域を解放 */
+		free(temp_node->msg);
+		free(temp_node);
+	}
+	g_first_comment_node = NULL;
+}
+
 
 %}
-
 
 %defines
 %token NUM IF FOR WHILE EXPR COMMENT ENDIF ENDWHILE END_OF_FILE ANY_OTHER ELSE ELSE_IF FUNCTION ENDFUNCTION ENDIF_SINGLE ENDWHILE_SINGLE
@@ -95,6 +148,7 @@ ifst    :   IF      			{	char format_str[] = "%sif (%s) then (true)\n";
 									char message_str[sizeof(format_str) + g_symbol_index + indent_level];
 									sprintf( message_str, format_str, INDENT_STR, synbol_name );
 									output_to_file(message_str, sizeof(message_str));
+									output_all_comment();
 									push_indent();
 									clear_synbol_string(); }
         ;
@@ -103,6 +157,7 @@ forst   :   FOR      			{	char format_str[] = "%swhile (%s)\n";
 									char message_str[sizeof(format_str) + g_symbol_index + indent_level];
 									sprintf( message_str, format_str, INDENT_STR, synbol_name );
 									output_to_file(message_str, sizeof(message_str));
+									output_all_comment();
 									push_indent();
 									clear_synbol_string(); }
         ;
@@ -111,6 +166,7 @@ whilest :   WHILE      			{	char format_str[] = "%swhile (%s)\n";
 									char message_str[sizeof(format_str) + g_symbol_index + indent_level];
 									sprintf( message_str, format_str, INDENT_STR, synbol_name );
 									output_to_file(message_str, sizeof(message_str));
+									output_all_comment();
 									push_indent();
 									clear_synbol_string(); }
         ;
@@ -120,6 +176,7 @@ endif	:	ENDIF				{	pop_indent();
 									char message_str[sizeof(format_str) + g_symbol_index + indent_level];
 									sprintf( message_str, format_str, INDENT_STR );
 									output_to_file(message_str, sizeof(message_str));
+									output_all_comment();
 									clear_synbol_string(); }
         ;
 
@@ -128,6 +185,7 @@ endwhile:	ENDWHILE			{	pop_indent();
 									char message_str[sizeof(format_str) + g_symbol_index + indent_level];
 									sprintf( message_str, format_str, INDENT_STR );
 									output_to_file(message_str, sizeof(message_str));
+									output_all_comment();
 									clear_synbol_string(); }
         ;
 
@@ -136,6 +194,7 @@ endif_s	:	ENDIF_SINGLE			{	pop_indent();
 									char message_str[sizeof(format_str) + g_symbol_index + indent_level];
 									sprintf( message_str, format_str, INDENT_STR, synbol_name, INDENT_STR );
 									output_to_file(message_str, sizeof(message_str));
+									output_all_comment();
 									clear_synbol_string(); }
         ;
 
@@ -144,6 +203,7 @@ endwhile_s:	ENDWHILE_SINGLE			{	pop_indent();
 									char message_str[sizeof(format_str) + g_symbol_index + indent_level];
 									sprintf( message_str, format_str, INDENT_STR, synbol_name, INDENT_STR );
 									output_to_file(message_str, sizeof(message_str));
+									output_all_comment();
 									clear_synbol_string(); }
         ;
 
@@ -153,6 +213,7 @@ else	:	ELSE				{	pop_indent();
 									char message_str[sizeof(format_str) + g_symbol_index + indent_level];
 									sprintf( message_str, format_str, INDENT_STR, "else" );
 									output_to_file(message_str, sizeof(message_str));
+									output_all_comment();
 									push_indent();
 									clear_synbol_string(); }
         ;
@@ -162,6 +223,7 @@ else_if :	ELSE_IF			{	pop_indent();
 									char message_str[sizeof(format_str) + g_symbol_index + indent_level];
 									sprintf( message_str, format_str, INDENT_STR, synbol_name );
 									output_to_file(message_str, sizeof(message_str));
+									output_all_comment();
 									push_indent();
 									clear_synbol_string(); }
         ;
@@ -170,6 +232,7 @@ functionst	:	FUNCTION		{	char format_str[] = "@startuml\n:%s;\nstart\n";
 									char message_str[sizeof(format_str) + g_symbol_index + indent_level];
 									sprintf( message_str, format_str, synbol_name );
 									output_to_file(message_str, sizeof(message_str));
+									output_all_comment();
 									push_indent();
 									clear_synbol_string(); }
         ;
@@ -178,6 +241,7 @@ endfunction	:	ENDFUNCTION		{	pop_indent();
 									char message_str[sizeof(format_str) + g_symbol_index + indent_level];
 									sprintf( message_str, format_str, INDENT_STR );
 									output_to_file(message_str, sizeof(message_str));
+									output_all_comment();
 									clear_synbol_string(); }
         ;
 
@@ -189,7 +253,12 @@ comment	:	COMMENT				{
 									printf("g_symbol_index=%d\n", 						g_symbol_index);
 									char comment_message_str[			sizeof(comment_format_str) + 	g_symbol_index + (indent_level*3)];
 									sprintf( comment_message_str, comment_format_str, INDENT_STR, INDENT_STR, synbol_name, INDENT_STR );
-									output_to_file(comment_message_str, sizeof(comment_message_str));
+									if(is_comment_locate_after){
+										backup_comment_message(comment_message_str, strlen(comment_message_str));
+									} else {
+										output_to_file(comment_message_str, sizeof(comment_message_str));
+										output_all_comment();
+									}
 									clear_synbol_string(); }
 
 /* その他はそのまま載せる */
@@ -197,6 +266,7 @@ any_other	:	ANY_OTHER		{ 	char comment_format_str[] = "%s:%s;\n";
 									char comment_message_str[sizeof(comment_format_str) + g_symbol_index + indent_level];
 									sprintf( comment_message_str, comment_format_str, INDENT_STR, synbol_name );
 									output_to_file(comment_message_str, sizeof(comment_message_str));
+									output_all_comment();
 									clear_synbol_string(); }
 
 /* ファイル終端 */

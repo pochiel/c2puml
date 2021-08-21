@@ -246,6 +246,7 @@ default{white}*:			{ 	printf("Start switch case in default block\n");
 %%
 
 #define C_OUTPUT_FILE_MAX    (256)
+extern int is_comment_locate_after;
 int main(int argc, char *argv[])
 {
     FILE * fptr_r = NULL;
@@ -264,6 +265,10 @@ int main(int argc, char *argv[])
             switch(opt){
                 case 'o':
                     strncpy(output_filne_name, argv[i+1], C_OUTPUT_FILE_MAX);
+                    break;
+                case 'b':
+                	/* ÉRÉÅÉìÉgãtèáê›íË */
+                    is_comment_locate_after = 0;
                     break;
                 default:
                     printf("Undefined Option.\n");
