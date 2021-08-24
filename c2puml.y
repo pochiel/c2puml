@@ -102,9 +102,14 @@ void output_all_comment(){
 
 %}
 
+%union {
+	int		itype;
+	char*	ctype;
+}
+
 %defines
-%token NUM IF FOR WHILE EXPR COMMENT ENDIF ENDWHILE END_OF_FILE ANY_OTHER ELSE ELSE_IF FUNCTION ENDFUNCTION ENDIF_SINGLE ENDWHILE_SINGLE
-%type program block expr term factor ifst forst whilest comment endif any_other else else_if functionst endfunction endif_s endwhile_s endwhile
+%token<ctype> NUM IF FOR WHILE EXPR COMMENT ENDIF ENDWHILE END_OF_FILE ANY_OTHER ELSE ELSE_IF FUNCTION ENDFUNCTION ENDIF_SINGLE ENDWHILE_SINGLE
+%type<ctype> program block expr term factor ifst forst whilest comment endif any_other else else_if functionst endfunction endif_s endwhile_s endwhile
 %left '+' '-'
 %left '*' '/'
 %left NEG
@@ -114,37 +119,37 @@ void output_all_comment(){
 
 %%
 /* •¶‚Ì‚Í‚¶‚ß */
-program : block ';'             { $$ = $1; }
-        | block		            { $$ = $1; }
-        | program block		    { $$ = $2; }
+program : block ';'             {  }
+        | block		            {  }
+        | program block		    {  }
         ;
 
-block   : expr                  { $$ = $1; }
-        | ifst                  { printf("ifst ok\n"); $$ = $1; }
-        | forst                 { printf("forst ok\n"); $$ = $1; }
-        | endif					{ printf("endif\n"); $$ = $1; }
-        | endwhile				{ printf("endfor\n"); $$ = $1; }
-        | else                  { printf("else\n"); $$ = $1; }
-        | else_if                  { printf("else if\n"); $$ = $1; }
-        | functionst			{ printf("function\n");$$ = $1; }
-        | endfunction			{ printf("end function\n");$$ = $1; }
-        | endif_s				{ printf("endif single\n"); $$ = $1; }
-        | endwhile_s			{ printf("endfor single\n"); $$ = $1; }
+block   : expr                  {  }
+        | ifst                  { printf("ifst ok\n");  }
+        | forst                 { printf("forst ok\n");  }
+        | endif					{ printf("endif\n");  }
+        | endwhile				{ printf("endfor\n");  }
+        | else                  { printf("else\n");  }
+        | else_if                  { printf("else if\n");  }
+        | functionst			{ printf("function\n"); }
+        | endfunction			{ printf("end function\n"); }
+        | endif_s				{ printf("endif single\n");  }
+        | endwhile_s			{ printf("endfor single\n");  }
         ;
 
-expr    : term                  { $$ = $1; }
-        | expr '+' term         { $$ = $1 + $3;    }
-        | expr '-' term         { $$ = $1 - $3; }
+expr    : term                  {  }
+        | expr '+' term         {  }
+        | expr '-' term         {  }
         ;
 
-term    : factor                { $$ = $1; }
-        | term '*' factor       { $$ = $1 * $3; }
-        | term '/' factor       { $$ = $1 / $3; }
+term    : factor                {  }
+        | term '*' factor       {  }
+        | term '/' factor       {  }
         ;
 
-factor  : EXPR                	{ $$ = $1; }
-		|  '(' expr ')'         { $$ = $2; }
-		| any_other				{ printf("any other\n"); $$ = $1; }
+factor  : EXPR                	{  }
+		|  '(' expr ')'         {  }
+		| any_other				{ printf("any other\n");  }
         | comment				{ printf("comment\n"); }
 		| END_OF_FILE			{ return 0; }
         ;
