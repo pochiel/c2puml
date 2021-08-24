@@ -238,13 +238,13 @@ default{white}*:			{ 	printf("Start switch case in default block\n");
 						}
 
 .				{	BEGIN(ST_ANY_OTHER); yymore();	}
-<ST_ANY_OTHER>;	{	printf("any other(s):        (%s) len=%d is_else_in_if=%d\n", yytext, yyleng, is_else_in_if);
+<ST_ANY_OTHER>.*;	{	printf("any other(s):        (%s) len=%d is_else_in_if=%d\n", yytext, yyleng, is_else_in_if);
 					BEGIN(INITIAL); 
 					push_synbol_string(yytext, yyleng); 
 					if(is_block_of_for==C_WITHOUT_BLOCK) { is_block_of_for=C_UNRELATED_WHILE; return(ENDWHILE_SINGLE); }
-					if(is_else_in_if==C_WITH_ELSE_SINGLE) { is_block_of_for=C_UNRELATED_WHILE; return(ENDIF_SINGLE); }
+					if(is_else_in_if==C_WITH_ELSE_SINGLE) { is_else_in_if=C_UNRELATED_WHILE; return(ENDIF_SINGLE); }
 					return(ANY_OTHER); }
-<ST_ANY_OTHER>;[ ]*else	{
+<ST_ANY_OTHER>.*;{white}*else	{
 					char buf[yyleng+1];
 					int buf_leng = yyleng;
 					printf("any other(s):        (%s) len=%d is_else_in_if=%d\n", yytext, yyleng, is_else_in_if);
@@ -260,7 +260,8 @@ default{white}*:			{ 	printf("Start switch case in default block\n");
 %%
 
 #define C_OUTPUT_FILE_MAX    (256)
-extern int is_comment_locate_after;
+extern int is_comment_locate_after;			/* コメントの挿入位置を1行遅らせる 		*/
+extern int is_generate_global_scope_code;	/* 関数の外に書かれたコードを出力する 	*/
 int main(int argc, char *argv[])
 {
     FILE * fptr_r = NULL;
@@ -283,6 +284,10 @@ int main(int argc, char *argv[])
                 case 'b':
                 	/* コメント逆順設定 */
                     is_comment_locate_after = 0;
+                    break;
+                case 'g':
+                	/* 関数の外に書かれたコードを出力する */
+                    is_generate_global_scope_code = 1;
                     break;
                 default:
                     printf("Undefined Option.\n");

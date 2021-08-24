@@ -17,6 +17,7 @@ FILE * output_file_ptr = NULL;
 
 /* グローバル変数（オプション引数） */
 int is_comment_locate_after = 1;			/* コメントの挿入位置を1行遅らせる */
+int is_generate_global_scope_code = 0;		/* 関数の外に書かれたコードを出力する */
 
 /* プロトタイプ宣言 */
 void yyerror(const char* s);
@@ -77,6 +78,7 @@ void backup_comment_message(char* msg_ptr, int len){
 	}
 	node->msg = malloc(len + 1);
 	strncpy(node->msg, msg_ptr, (len));
+	node->msg[len] = '\0';
 	node->size = len;
 	node->next = NULL;
 }
@@ -89,7 +91,6 @@ void output_all_comment(){
 	while(node != NULL){
 		temp_node = node;
 		node = node->next;
-		printf("output comment msg:%s\n", temp_node->msg);
 		output_to_file(temp_node->msg, temp_node->size);
 		/* メモリ領域を解放 */
 		free(temp_node->msg);
@@ -236,17 +237,17 @@ else_if :	ELSE_IF			{	pop_indent();
 functionst	:	FUNCTION		{	char format_str[] = "@startuml\n:%s;\nstart\n";
 									char message_str[sizeof(format_str) + g_symbol_index + indent_level];
 									sprintf( message_str, format_str, synbol_name );
+									push_indent();											// 先にIndent
 									output_to_file(message_str, sizeof(message_str));
 									output_all_comment();
-									push_indent();
 									clear_synbol_string(); }
         ;
-endfunction	:	ENDFUNCTION		{	pop_indent();
-									char format_str[] = "%sstop\n@enduml\n";
-									char message_str[sizeof(format_str) + g_symbol_index + indent_level];
-									sprintf( message_str, format_str, INDENT_STR );
-									output_to_file(message_str, sizeof(message_str));
+endfunction	:	ENDFUNCTION		{	
+									char format_str[] = "stop\n";
+									output_to_file("stop\n", sizeof("stop\n"));
 									output_all_comment();
+									output_to_file("@enduml\n", sizeof("@enduml\n"));
+									pop_indent();											// 後にIndent
 									clear_synbol_string(); }
         ;
 
@@ -279,7 +280,9 @@ any_other	:	ANY_OTHER		{ 	char comment_format_str[] = "%s:%s;\n";
 %%
 
 void output_to_file(char * smbl, int size){
+	if( (is_generate_global_scope_code) || is_in_function()){
 		fprintf(output_file_ptr, "%s ", smbl); // ファイルに書く
+	}
 }
 
 void push_synbol_string(char * smbl, int size){
