@@ -204,7 +204,8 @@ endif_s	:	ENDIF_SINGLE			{	pop_indent();
 									char format_str[] = "%s:%s;\n%sendif\n";
 									char message_str[sizeof(format_str) + g_symbol_index + indent_level];
 									sprintf( message_str, format_str, INDENT_STR, synbol_name, INDENT_STR );
-									output_to_file(message_str, sizeof(message_str));
+									printf(" +++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++;;;%s\n", message_str);
+									output_to_file(message_str, strlen(message_str));
 									output_all_comment();
 									clear_synbol_string(); }
         ;

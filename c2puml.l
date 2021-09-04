@@ -250,9 +250,22 @@ default{white}*:			{ 	printf("Start switch case in default block\n");
 					printf("any other(s):        (%s) len=%d is_else_in_if=%d\n", yytext, yyleng, is_else_in_if);
 					BEGIN(INITIAL); 
 					remove_line_feed(yytext, yyleng, buf, &buf_leng);
-					push_synbol_string(yytext, yyleng); 
+					push_synbol_string(buf, buf_leng); 
 					if(is_else_in_if==C_WITH_ELSE_SINGLE) {  return(ENDIF_SINGLE); }
 					return(ANY_OTHER); }
+
+<ST_ANY_OTHER>.*;{white}*else{white}+if{white}*\(	{
+					char buf[yyleng+1];
+					int buf_leng = yyleng;
+					remove_line_feed(yytext, yyleng, buf, &buf_leng);
+					push_synbol_string(buf, buf_leng); 
+					printf("any other(s):        (%s) len=%d is_else_in_if=%d\n", buf, buf_leng, is_else_in_if);
+					printf("start if                           g_bracket_cnt=%d\n", g_bracket_cnt);
+					BEGIN(ST_IF_EXPR);
+					g_bracket_cnt++;
+					return(ANY_OTHER); }
+
+
 <ST_ANY_OTHER>. {	yymore(); }
 
 <<EOF>>			{ printf("end of file\n"); return(END_OF_FILE); }
