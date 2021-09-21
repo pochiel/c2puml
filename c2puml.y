@@ -44,7 +44,7 @@ void pop_indent() {
 			if( indent_level > 0 ){
 				indent_level--; 
 			} else {
-				printf("*** [ERROR] Wrong Indent Level Pop!! ***");			
+				printf("*** [ERROR] Wrong Indent Level Pop!! ***\n");			
 			}
 }
 
@@ -154,7 +154,12 @@ factor  : EXPR                	{  }
 		| END_OF_FILE			{ return 0; }
         ;
 
-/* if文の変換 */
+/*******************************************************************************************************************
+			if文
+			In	： synbol_name → if条件式
+			Out	： else のみ。
+			備考： 
+*/
 ifst    :   IF      			{	char format_str[] = "%sif (%s) then (true)\n";
 									char message_str[sizeof(format_str) + g_symbol_index + indent_level];
 									sprintf( message_str, format_str, INDENT_STR, synbol_name );
@@ -219,7 +224,12 @@ endwhile_s:	ENDWHILE_SINGLE			{	pop_indent();
 									clear_synbol_string(); }
         ;
 
-
+/*******************************************************************************************************************
+			else句
+			In	： 無し
+			Out	： else のみ。
+			備考： 
+*/
 else	:	ELSE				{	pop_indent();
 									char format_str[] = "%selse\n";
 									char message_str[sizeof(format_str) + g_symbol_index + indent_level];
@@ -229,8 +239,13 @@ else	:	ELSE				{	pop_indent();
 									push_indent();
 									clear_synbol_string(); }
         ;
-
-else_if :	ELSE_IF			{	pop_indent();
+/*******************************************************************************************************************
+			else if 句
+			In	： synbol_name= else if 条件式
+			Out	： elseif(条件式) then (true)
+			備考： 
+*/
+else_if :	ELSE_IF				{	pop_indent();
 									char format_str[] = "%selseif (%s) then (true)\n";
 									char message_str[sizeof(format_str) + g_symbol_index + indent_level];
 									sprintf( message_str, format_str, INDENT_STR, synbol_name );
