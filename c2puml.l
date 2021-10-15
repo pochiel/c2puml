@@ -1,9 +1,11 @@
 %{
-#include "c2puml.tab.h"
+#include "parser.hpp"
 #include <string.h>
-extern void push_synbol_string(char * smbl, int size);
-extern void clear_synbol_string();
+#include <string>
+
 extern FILE * output_file_ptr;
+extern "C" int yylex();
+
 int g_bracket_cnt = 0;
 
 enum {
@@ -60,11 +62,11 @@ t_blocktype block_stack[MAX_OF_BLOCK_STACK] = {C_BLOCK_TYPE_NONE};
 int block_stack_index = 0;
 
 void push_block_stack(t_blocktype stc)	{
-		printf("*************************** [push] blockstack[%d->%d]=%d\n", block_stack_index, block_stack_index+1, stc);
+		// printf("*************************** [push] blockstack[%d->%d]=%d\n", block_stack_index, block_stack_index+1, stc);
 		block_stack[++	block_stack_index] = stc;
 	}
 t_blocktype pop_block_stack()	{
-	printf("*************************** [pop] blockstack[%d->%d]=%d\n", block_stack_index, block_stack_index-1, block_stack[block_stack_index]);
+	// printf("*************************** [pop] blockstack[%d->%d]=%d\n", block_stack_index, block_stack_index-1, block_stack[block_stack_index]);
 	if(block_stack_index==0){ return C_BLOCK_TYPE_WRONG; }
 	return block_stack[block_stack_index--];
 	}
@@ -72,6 +74,13 @@ t_blocktype pop_block_stack()	{
 t_blocktype get_block_stack()	{
 	return block_stack[block_stack_index];
 }
+
+/* 関数の終端を判別するためのカーリーブレース数カウンタ */
+static int g_function_brace_cnt = 0;
+
+
+#define SET_YYLVAL(_b__buf__)	do{	yylval.ctype = new std::string(_b__buf__);	}while(0)
+
 %}
 
 white       [ |\t|\r|\n]
@@ -80,6 +89,7 @@ integer     [0-9]+
 symbol      [=+\-\^*/();\n]
 letter      [_[:alpha:]][_[:alnum:]]*
 other       .
+other_cr	[[.]]
 
 %x STRING
 %x CHARA
@@ -87,9 +97,13 @@ other       .
 %x ST_LINE_COMMENT
 %x ST_IF_EXPR
 %x ST_FOR_EXPR
-%x ST_1LINE_FOR
 %x ST_WHILE_EXPR
 %x ST_ANY_OTHER
+%x ST_SWITCH_EXPR
+%x ST_CASE_EXPR
+%x ST_RETRN_EXPR
+%x ST_GOTO_EXPR
+
 
 TYPE            void|char|int|float|double|short|long|signed|unsigned|sizeof
 STO_CLASS       extern|static|auto|register
@@ -114,21 +128,18 @@ TYPEID          typeid
 %{  /*****************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************
 	* 関数宣言を検出して通知する
-	*	責務：関数宣言を push_synbol_string し、return(FUNCTION)する 
+	*	責務：関数宣言を SET_YYLVAL し、return(FUNCTION)する 
 	******************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************/ %}
-{C_KEYWORDS}*{white}*{letter}+{white}*\(.*\){white}*\{	{
-												char buf[yyleng+1];
-												int buf_leng = yyleng;
+({C_KEYWORDS}|{letter}|{white}|\*)*{white}*{letter}+{white}*\([^\(\)]*\)	{
+												printf("=================================================-func? %d\n", g_function_brace_cnt);
 												if(block_stack_index != 0) {
 													/* 関数宣言は stack 0 でのみ検出
 													（もうちょっとうまいやり方ないかなあ・・・） */
-													printf("[Info] function def rejected.\n");
+													// printf("[Info] function def rejected.\n");
 													REJECT;
 												} else {
-													remove_line_feed(yytext, yyleng, buf, &buf_leng);
-													printf("start function:%s\n", buf);
-													push_synbol_string(buf, buf_leng);
+													SET_YYLVAL(yytext);
 													push_block_stack(C_BLOCK_TYPE_FUNCTION);
 													return(FUNCTION);
 												}
@@ -139,7 +150,7 @@ TYPEID          typeid
 %{  /*****************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************
 	* if条件を検出して通知する
-	*	責務：if条件式を push_synbol_string し、BEGIN(INITIAL) し、return(IF)する 
+	*	責務：if条件式を SET_YYLVAL し、BEGIN(INITIAL) し、return(IF)する 
 	******************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************/ %}
 
@@ -147,9 +158,10 @@ TYPEID          typeid
 	* if条件式検出開始
 	*/ %}
 if{white}*\(				{
-								printf("start if g_bracket_cnt=%d\n", g_bracket_cnt);
+								// printf("start if g_bracket_cnt=%d\n", g_bracket_cnt);
 								BEGIN(ST_IF_EXPR); 
-								g_bracket_cnt++; 
+								g_bracket_cnt++;
+								return(IF);
 							}
 
 %{  /*********************************************************************************
@@ -157,34 +169,25 @@ if{white}*\(				{
 	*/ %}
 <ST_IF_EXPR>\(				{
 								g_bracket_cnt++;
-								// printf("if bracket cnt=%d\n", g_bracket_cnt);
+								printf("if bracket cnt=%d\n", g_bracket_cnt);
 								yymore();
 							}
 
 %{  /*********************************************************************************
-	* if条件式検出中の ) -> { 検出. if条件式検出中に{ が入ってくることはないので、if条件式検出完了
+	* if条件式検出中の ) 検出. g_bracke_cntが0になるまで式が完結したとはみなさない
 	*/ %}
-<ST_IF_EXPR>\){white}*\{	{
+<ST_IF_EXPR>\)				{
 								g_bracket_cnt--;
 								if(g_bracket_cnt == 0) {
 									// if条件式検出完了
-									char buf[yyleng+1];
-									int buf_leng = yyleng;
-
 									printf("bracket closed\n");
 									printf("if block\n");
-	
-									// if block を1段積む
-									push_block_stack(C_BLOCK_TYPE_IF);
-									// 改行除去して push_symbol_string する
-									remove_line_feed(yytext, yyleng, buf, &buf_leng);
-									push_synbol_string(buf, buf_leng);
+
 									BEGIN(INITIAL);
-									is_else_in_if = C_WITH_ELSE_BLOCK;
-									return(IF);
+									SET_YYLVAL(yytext);
+									return(EXPR);
 								} else {
-									// 通常ここに入ってくることはないはずだが・・・
-									printf(" ********* [Error!!] bracket more! ********* \n");
+									printf("bracke more g_bracket_cnt=%d", g_bracket_cnt);
 									yymore();
 								}
 							}
@@ -197,36 +200,10 @@ if{white}*\(				{
 							}
 
 %{  /*********************************************************************************
-	* if条件式検出中の ) 検出. g_bracket_cnt == 0 ならば、if条件式検出完了
-	* { が検出されないので { 無し1行 if文。 ほんとこれやめてほしい。
-	*/ %}
-<ST_IF_EXPR>\)   			{
-								g_bracket_cnt--;
-								if(g_bracket_cnt == 0) {
-									// if条件式検出完了
-									char buf[yyleng+1];
-									int buf_leng = yyleng;
-
-									printf("bracket closed\n");
-									printf("if single\n");
-
-									// if block を1段積む
-									push_block_stack(C_BLOCK_TYPE_IF);
-									// 改行除去して push_symbol_string する
-									remove_line_feed(yytext, yyleng, buf, &buf_leng);
-									push_synbol_string(buf, buf_leng);
-									BEGIN(INITIAL);
-									is_else_in_if = C_WITH_ELSE_SINGLE;
-									return(IF);
-								} else {
-									yymore();
-								}
-							}
-
-%{  /*********************************************************************************
 	*  それ以外の文字。 if条件式を構成する文字であるため、普通に yymore() する。
 	*/ %}
 <ST_IF_EXPR>.  				{
+								printf("---------if text: %s", yytext);
 								yymore();
 							}
 
@@ -237,142 +214,55 @@ if{white}*\(				{
 	******************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************/ %}
 %{  /*********************************************************************************
-	*  { つき else の検出
-	*/ %}
-else{white}*\{				{
-								printf("start else block\n");
-								pop_block_stack();
-								push_block_stack(C_BLOCK_TYPE_ELSE);
-								yymore();
-								return(ELSE);
-							}
-%{  /*********************************************************************************
-	*  { なし else の検出
+	*  else の検出
 	*/ %}
 else						{
-								// if条件式検出完了
-								char buf[yyleng+1];
-								int buf_leng = yyleng;
-
-								printf("start else single\n");
-								pop_block_stack();
-
-								// if block を1段積む
-								push_block_stack(C_BLOCK_TYPE_IF);
-								// 改行除去して push_symbol_string する
-								remove_line_feed(yytext, yyleng, buf, &buf_leng);
-								push_synbol_string(buf, buf_leng);
-
-								is_else_in_if = C_WITH_ELSE_SINGLE;
-
-								push_block_stack(C_BLOCK_TYPE_ELSE);
+								// printf("start else block\n");
 								return(ELSE);
 							}
 
-%{  /*****************************************************************************************************************************************************************
-	******************************************************************************************************************************************************************
-	* else if 検出して通知する
-	*	責務：if条件式を push_synbol_string し、BEGIN(INITIAL) し、return(elseif)する 
-	******************************************************************************************************************************************************************
-	******************************************************************************************************************************************************************/ %}
-%{  /*********************************************************************************
-	*  { つき else if の検出
-	*  この関数がないと、 ifブロック中の } を受けた時点で end if を出力してしまう。
-	*/ %}
-else{white}+if{white}*\(.*\){white}*\{							{
-								printf("Start else if block\n");
-								pop_block_stack();
-								push_block_stack(C_BLOCK_TYPE_ELSE);
-								char buf[yyleng+1];
-								int buf_leng = yyleng;
-								remove_line_feed(yytext, yyleng, buf, &buf_leng);
-								printf("else if(s):        (%s) len=%d \n", buf, buf_leng);
-								BEGIN(INITIAL);
-								push_synbol_string(buf, buf_leng);
-								return(ELSE_IF);
-							}
-%{  /*********************************************************************************
-	*  { なし else if の検出
-	*/ %}
-else{white}+if{white}*\(.*\){white}*(\r|\n)							{	
-								printf("Start else if block\n");
-								pop_block_stack();
-								push_block_stack(C_BLOCK_TYPE_ELSE);
-								char buf[yyleng+1];
-								int buf_leng = yyleng;
-								remove_line_feed(yytext, yyleng, buf, &buf_leng);
-								printf("else if(s):        (%s) len=%d \n", buf, buf_leng);
-								BEGIN(INITIAL);
-								push_synbol_string(buf, buf_leng);
-
-								is_else_in_if = C_WITH_ELSE_SINGLE;
-								return(ELSE_IF);
-							}
 
 %{  /*****************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************
 	* for 検出して通知する
-	*	責務：for条件式を push_synbol_string し、BEGIN(INITIAL) し、return(FOR)する 
+	*	責務：for条件式を SET_YYLVAL し、BEGIN(INITIAL) し、return(FOR)する 
 	******************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************/ %}
 %{  /*********************************************************************************
 	* for条件式検出開始
 	*/ %}
 for{white}*\(				{
-								printf("start for g_bracket_cnt=%d\n", g_bracket_cnt);
+								// printf("start for g_bracket_cnt=%d\n", g_bracket_cnt);
 								BEGIN(ST_FOR_EXPR);
 								g_bracket_cnt++;
+								return(FOR);
 							}
+
 %{  /*********************************************************************************
-	* for条件式検出中の ( 検出. g_bracke_cntが0になるまで式が完結したとはみなさない
+	* for条件式検出中の ) 検出. g_bracke_cntが0になるまで式が完結したとはみなさない
 	*/ %}
-<ST_FOR_EXPR>\(				{
-								g_bracket_cnt++;
-								printf("for bracket cnt=%d", g_bracket_cnt);
-								yymore();
-							}
-%{  /*********************************************************************************
-	* for条件式検出中の ) -> { 検出. for条件式検出中に{ が入ってくることはないので、for条件式検出完了
-	*/ %}
-<ST_FOR_EXPR>\){white}*\{	{
-								printf("for block\n");
-								printf("for(s):(%s) len=%d g_bracket_cnt = %d\n", yytext, yyleng, g_bracket_cnt);
+<ST_FOR_EXPR>\)				{
 								g_bracket_cnt--;
 								if(g_bracket_cnt == 0) {
-									push_block_stack(C_BLOCK_TYPE_FOR);
-									char buf[yyleng+1];
-									int buf_leng = yyleng;
-									printf("bracket closed\n");
-									remove_line_feed(yytext, yyleng, buf, &buf_leng);
-									BEGIN(INITIAL); push_synbol_string(buf, buf_leng);
-									is_block_of_for = C_WITH_BLOCK;
-									return(FOR);
+									// for条件式検出完了
+									// printf("bracket closed\n");
+									// printf("for block\n");
+									BEGIN(INITIAL);
+
+									SET_YYLVAL(yytext);
+									return(EXPR);
 								} else {
-									printf("bracket more!\n");
 									yymore();
 								}
 							}
 
 %{  /*********************************************************************************
-	* for条件式検出中の ) 検出.  g_bracket_cnt == 0 ならば、for条件式検出完了
-	* { が検出されないので { 無し1行 for文。 ほんとこれやめてほしい。
+	* for条件式検出中の ( 検出. g_bracke_cntが0になるまで式が完結したとはみなさない
 	*/ %}
-<ST_FOR_EXPR>\)   			{
-								g_bracket_cnt--;
-								if(g_bracket_cnt == 0) {
-									printf("for(s): (%s) len=%d g_bracket_cnt = %d\n", yytext, yyleng, g_bracket_cnt);
-									char buf[yyleng+1];
-									int buf_leng = yyleng;
-									printf("bracket closed\n");
-									remove_line_feed(yytext, yyleng, buf, &buf_leng);
-									BEGIN(INITIAL);
-									push_synbol_string(buf, buf_leng);
-									is_block_of_for = C_WITHOUT_BLOCK;
-									return(FOR);
-								} else {
-									printf("bracket more!\n");
-									yymore();
-								}
+<ST_FOR_EXPR>\(				{
+								g_bracket_cnt++;
+								// printf("for bracket cnt=%d", g_bracket_cnt);
+								yymore();
 							}
 
 %{  /*********************************************************************************
@@ -390,64 +280,36 @@ for{white}*\(				{
 %{  /*****************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************
 	* for 検出して通知する
-	*	責務：for条件式を push_synbol_string し、BEGIN(INITIAL) し、return(FOR)する 
+	*	責務：for条件式を SET_YYLVAL し、BEGIN(INITIAL) し、return(FOR)する 
 	******************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************/ %}
 %{  /*********************************************************************************
 	* while条件式検出開始
 	*/ %}
 while{white}*\(				{
-								printf("start for g_bracket_cnt=%d\n", g_bracket_cnt);
+								// printf("start for g_bracket_cnt=%d\n", g_bracket_cnt);
 								BEGIN(ST_WHILE_EXPR);
 								g_bracket_cnt++;
+								return(WHILE);
 							}
 %{  /*********************************************************************************
 	* while 条件式検出中の ( 検出. g_bracke_cntが0になるまで式が完結したとはみなさない
 	*/ %}
 <ST_WHILE_EXPR>\(			{
 								g_bracket_cnt++;
-								printf("while bracket cnt=%d", g_bracket_cnt);
+								// printf("while bracket cnt=%d", g_bracket_cnt);
 								yymore();
 							}
 %{  /*********************************************************************************
-	* while条件式検出中の ) -> { 検出. whilte条件式検出中に{ が入ってくることはないので、while条件式検出完了
-	*/ %}
-<ST_WHILE_EXPR>\){white}*\{	{
-								g_bracket_cnt--;
-								if(g_bracket_cnt == 0) {
-									printf("while block\n");
-									printf("for(s): (%s) len=%d g_bracket_cnt = %d\n", yytext, yyleng, g_bracket_cnt);
-									push_block_stack(C_BLOCK_TYPE_WHILE);
-									char buf[yyleng+1];
-									int buf_leng = yyleng;
-									remove_line_feed(yytext, yyleng, buf, &buf_leng);
-									BEGIN(INITIAL); push_synbol_string(buf, buf_leng);
-									is_block_of_for = C_WITH_BLOCK;
-									return(FOR);
-								} else {
-									printf("bracket more!\n");
-									yymore();
-								}
-							}
-
-%{  /*********************************************************************************
 	* while 条件式検出中の ) 検出.  g_bracket_cnt == 0 ならば、while条件式検出完了
-	* { が検出されないので { 無し1行 while 文。 ほんとこれやめてほしい。
 	*/ %}
 <ST_WHILE_EXPR>\)   		{
 								g_bracket_cnt--;
 								if(g_bracket_cnt == 0) {
-									printf("while single\n");
-									printf("for(s): (%s) len=%d g_bracket_cnt = %d\n", yytext, yyleng, g_bracket_cnt);
-									push_block_stack(C_BLOCK_TYPE_WHILE);
-									char buf[yyleng+1];
-									int buf_leng = yyleng;
-									remove_line_feed(yytext, yyleng, buf, &buf_leng);
-									BEGIN(INITIAL); push_synbol_string(buf, buf_leng);
-									is_block_of_for = C_WITHOUT_BLOCK;
-									return(FOR);
+									BEGIN(INITIAL);
+									SET_YYLVAL(yytext);
+									return(EXPR);
 								} else {
-									printf("bracket more!\n");
 									yymore();
 								}
 							}
@@ -468,106 +330,133 @@ while{white}*\(				{
 %{  /*****************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************
 	* コメントの検出処理
-	*	責務：コメント内容を push_synbol_string し、BEGIN(INITIAL) し、return(ST_COMMENT)する 
+	*	責務：コメント内容を SET_YYLVAL し、BEGIN(INITIAL) し、return(ST_COMMENT)する 
 	******************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************/ %}
 "/*"            		{	BEGIN(ST_COMMENT); yymore();	}
-<ST_COMMENT>"*/"   		{	printf("Comment(s):        (%s) len=%d\n", yytext, yyleng); BEGIN(INITIAL); push_synbol_string(yytext, yyleng); return(COMMENT); }
+<ST_COMMENT>"*/"   		{	// printf("Comment(s):        (%s) len=%d\n", yytext, yyleng);
+							BEGIN(INITIAL);
+							SET_YYLVAL(yytext);
+							return(COMMENT); }
 <ST_COMMENT>"*"    		{	yymore(); }
 <ST_COMMENT>[^*]+  		{	yymore(); }
 
-"//".*(\r|\n)            		{	printf("Comment(s):        (%s) len=%d\n", yytext, yyleng); push_synbol_string(yytext, yyleng); return(COMMENT); }
+"//".*(\r|\n) 			{	// printf("Comment(s):        (%s) len=%d\n", yytext, yyleng); 
+							SET_YYLVAL(yytext);
+							return(COMMENT);
+						}
 
 
 %{  /*****************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************
 	* switch case処理
-	*	責務：switch条件式を push_synbol_string し、BEGIN(INITIAL) し、return(IF)する 
+	*	責務：switch条件式を SET_YYLVAL し、BEGIN(INITIAL) し、return(SWTICH)する 
 	******************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************/ %}
 %{  /*********************************************************************************
-	*  { つき switch 開始を検出する。
+	*  switch 条件式を検出開始する。
 	*/ %}
-switch{white}*\(.+\){white}*\{		{
-										char buf[yyleng+1];
+switch{white}*			{
+							BEGIN(ST_SWITCH_EXPR); 
+							return(SWITCH);
+						}
 
-										printf("Start switch case block\n");
-										push_block_stack(C_BLOCK_TYPE_IF);
-										// switch条件式検出完了
-										int buf_leng = yyleng;
+%{  /*********************************************************************************
+	* switch条件式検出中の ( 検出. g_bracke_cntが0になるまで式が完結したとはみなさない
+	*/ %}
+<ST_SWITCH_EXPR>\(			{
+								g_bracket_cnt++;
+								yymore();
+							}
 
-										// if block を1段積む
-										push_block_stack(C_BLOCK_TYPE_IF);
-										// 改行除去して push_symbol_string する
-										remove_line_feed(yytext, yyleng, buf, &buf_leng);
-										push_synbol_string(buf, buf_leng);
-										BEGIN(INITIAL);
-										// is_else_in_if = C_WITH_ELSE_BLOCK;
-										return(IF);
-									}
+%{  /*********************************************************************************
+	* expr条件式検出中の ) 検出. g_bracke_cntが0になるまで式が完結したとはみなさない
+	*/ %}
+<ST_SWITCH_EXPR>\)				{
+								g_bracket_cnt--;
+								if(g_bracket_cnt == 0) {
+									// switch条件式検出完了
+									BEGIN(INITIAL);
+									SET_YYLVAL(yytext);
+									return(EXPR);
+								} else {
+									yymore();
+								}
+							}
+
+%{  /*********************************************************************************
+	*  それ以外の文字。 switch条件式を構成する文字であるため、普通に yymore() する。
+	*/ %}
+<ST_SWITCH_EXPR>.  			{
+								yymore();
+							}
 
 %{  /*********************************************************************************
 	*  caseを検出する。
-	*   else if 条件式をpush_synbol_string し、BEGIN(INITIAL) し、return(ELSE_IF)する 
+	*   case 条件式をSET_YYLVAL し、BEGIN(INITIAL) し、return(CASE)する 
 	*/ %}
-case{white}+.+:			{
-							char buf[yyleng+1];
-							int buf_leng = yyleng;
-
-							printf("Start switch case in Case block\n");
-							pop_block_stack();
-							push_block_stack(C_BLOCK_TYPE_ELSE);
-							remove_line_feed(yytext, yyleng, buf, &buf_leng);
-							printf("else if(s):        (%s) len=%d \n", buf, buf_leng);
-							BEGIN(INITIAL); push_synbol_string(buf, buf_leng);
-							return(ELSE_IF);
+%{  /*********************************************************************************
+	*  case 条件式を検出開始する。
+	*/ %}
+case{white}+			{
+							BEGIN(ST_CASE_EXPR); 
+							return(CASE);
 						}
+
+%{  /*********************************************************************************
+	* case expr条件式検出中の : 検出. 完結したとみなす。
+	*/ %}
+<ST_CASE_EXPR>:			{
+								// case条件式検出完了
+								BEGIN(INITIAL);
+								SET_YYLVAL(yytext);
+								return(EXPR);
+							}
+
+
+%{  /*********************************************************************************
+	*  それ以外の文字。 switch条件式を構成する文字であるため、普通に yymore() する。
+	*/ %}
+<ST_CASE_EXPR>.  			{
+								yymore();
+							}
+
 %{  /*********************************************************************************
 	*  default句を検出する。
 	*   return(ELSE)する 
 	*/ %}
 
 default{white}*:		{
-							printf("Start switch case in default block\n");
-							pop_block_stack();
-							push_block_stack(C_BLOCK_TYPE_ELSE);
-							return(ELSE);
+							// printf("Start switch case in default block\n");
+							return(DEFAULT);
 						}
 
 %{  /*****************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************
-	* 閉じカッコ } 処理 blockの終端処理
+	* 二重カッコ {} 処理 blockの終端処理
 	*	責務：現在の block_stack からpopし、閉じた block の種類に応じて適切な終端処理を行う
 	******************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************/ %}
-\}   					{
-							printf("defind brace\n");
-							/* block stack が0なのに終端しようとした、破綻している */
-							if(block_stack_index==0){
-								yyerror ("[ERROR] block stack wrong\n");
-								
-							}
-							switch(pop_block_stack()){
-								case C_BLOCK_TYPE_FUNCTION:
-									printf("function block closed\n");
-									push_synbol_string("stop\n@enduml", sizeof("stop\n@enduml"));
-									return(ENDFUNCTION);
-									break;
-								case C_BLOCK_TYPE_IF:
-								case C_BLOCK_TYPE_ELSE:
-									printf("if block closed\n");
-									return(ENDIF);
-									break;
-								case C_BLOCK_TYPE_FOR:
-								case C_BLOCK_TYPE_WHILE:
-									printf("while block closed\n");
-									return(ENDWHILE);
-									break;
-								default:
-									yyerror("[ERROR] invalid block type poped.\n");
-									break;
-							}
+\{						{
+							g_function_brace_cnt++;
+							//printf("start brace g_function_brace_cnt=%d\n", g_function_brace_cnt);
+							return(BRACE);
 						}
+
+\}   					{
+							g_function_brace_cnt--;
+							//printf("end brace g_function_brace_cnt=%d\n", g_function_brace_cnt);
+							if(g_function_brace_cnt==0){
+								pop_block_stack();		// 関数終了
+							}
+							return(END_BRACE);
+						}
+
+%{  /*********************************************************************************
+	*  ; だけの入力を無視する。 do { } while(expr); の末尾の ; を無視する。
+	*/ %}
+;					{ }
+
 
 %{  /*****************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************
@@ -587,94 +476,102 @@ default{white}*:		{
 	*  なんか入ってきたら取り込む。コンマを終端記号として１行を終える。
 	*/ %}
 <ST_ANY_OTHER>.*;	{
-						printf("any other(s):        (%s) len=%d is_else_in_if=%d is_block_of_for=%d \n", yytext, yyleng, is_else_in_if, is_block_of_for);
 						BEGIN(INITIAL); 
-						push_synbol_string(yytext, yyleng); 
-						/* 現在何のブロック上いるのかに応じて処理を変える */
-						switch( get_block_stack() ) {
-							case C_BLOCK_TYPE_WHILE:
-							case C_BLOCK_TYPE_FOR:
-								/* for/while block 上であれば、single for の処理 */
-								if(is_block_of_for==C_WITHOUT_BLOCK) {
-									printf("#### %s(%d)\n", __func__, __LINE__);
-									/* single while(or for)なので、endwhileする */
-									is_block_of_for=C_UNRELATED_WHILE;
-									return(ENDWHILE_SINGLE);
-								}
-							break;
-							case C_BLOCK_TYPE_IF:
-							case C_BLOCK_TYPE_ELSE:
-								/* if/else block 上であれば、single if の処理 */
-								if(is_else_in_if==C_WITH_ELSE_SINGLE) {
-									printf("#### %s(%d)\n", __func__, __LINE__);
-									/* single if なので endifする */
-									is_else_in_if=C_UNRELATED_WHILE;
-									return(ENDIF_SINGLE);
-								}
-							break;
-							case C_BLOCK_TYPE_FUNCTION:
-							default:
-								/* do nothing. */
-								break;
-						}
-						printf("#### %s(%d)\n", __func__, __LINE__);
+						SET_YYLVAL(yytext);
 						return(ANY_OTHER);
 					}
-
-%{  /*********************************************************************************
-	*  なんか入ってきた後、else と続いていたら、if節のあとの 1行 else とみなす。
-	*/ %}
-<ST_ANY_OTHER>.*;{white}*else					{
-						char buf[yyleng+1];
-						int buf_leng = yyleng;
-
-						// printf("any other(s):        (%s) len=%d is_else_in_if=%d\n", yytext, yyleng, is_else_in_if);
-						
-						BEGIN(INITIAL);
-						remove_line_feed(yytext, yyleng, buf, &buf_leng);
-						push_synbol_string(buf, buf_leng); 
-						
-						if(is_else_in_if==C_WITH_ELSE_SINGLE) {
-							/* single if なので elseする */
-							return(ELSE);
-						}
-						return(ANY_OTHER);
-					}
-
-%{  /*********************************************************************************
-	*  なんか入ってきた後、else if と続いていたら、if節のあとの 1行 else ifとみなす。
-	*/ %}
-<ST_ANY_OTHER>.*;{white}*else{white}+if{white}*\(					{
-						char buf[yyleng+1];
-						int buf_leng = yyleng;
-						remove_line_feed(yytext, yyleng, buf, &buf_leng);
-						push_synbol_string(buf, buf_leng); 
-						printf("any other(s):        (%s) len=%d is_else_in_if=%d\n", buf, buf_leng, is_else_in_if);
-						printf("start if                           g_bracket_cnt=%d\n", g_bracket_cnt);
-						BEGIN(ST_IF_EXPR);
-						g_bracket_cnt++;
-						return(ANY_OTHER);
-					}
-
 
 %{  /*********************************************************************************
 	*  それ以外の何かが入ってきた。
 	*/ %}
 <ST_ANY_OTHER>. {	yymore(); }
 
+%{  /*********************************************************************************
+	*  do の検出
+	*/ %}
+do{white}+					{ 	return(DO); }
+
+%{  /*********************************************************************************
+	*  break の検出
+	*/ %}
+break{white}*;				{ 	return(BREAK); }
+
+%{  /*********************************************************************************
+	*  continue  の検出
+	*/ %}
+continue{white}*;			{ 	return(CONTINUE); }
+
+%{  /*****************************************************************************************************************************************************************
+	******************************************************************************************************************************************************************
+	* return 検出して通知する
+	*	責務：return条件式を SET_YYLVAL し、BEGIN(INITIAL) し、return(RETRN)する 
+	******************************************************************************************************************************************************************
+	******************************************************************************************************************************************************************/ %}
+
+%{  /*********************************************************************************
+	* return条件式検出開始
+	*/ %}
+return{white}+				{
+								BEGIN(ST_RETRN_EXPR);
+								return(RETRN);
+							}
+%{  /*********************************************************************************
+	* return 条件式検出中の ; 検出.  return条件式検出完了
+	*/ %}
+<ST_RETRN_EXPR>\;   		{
+								BEGIN(INITIAL);
+								SET_YYLVAL(yytext);
+								return(EXPR);
+							}
+
+%{  /*********************************************************************************
+	*  それ以外の何かが入ってきた。
+	*/ %}
+<ST_RETRN_EXPR>. {	yymore(); }
+
+%{  /*****************************************************************************************************************************************************************
+	******************************************************************************************************************************************************************
+	* return 検出して通知する
+	*	責務：return条件式を SET_YYLVAL し、BEGIN(INITIAL) し、return(RETRN)する 
+	******************************************************************************************************************************************************************
+	******************************************************************************************************************************************************************/ %}
+
+%{  /*********************************************************************************
+	* goto条件式検出開始
+	*/ %}
+goto{white}+				{
+								BEGIN(ST_GOTO_EXPR);
+								return(GOTO);
+							}
+%{  /*********************************************************************************
+	* goto 条件式検出中の ; 検出.  goto条件式検出完了
+	*/ %}
+<ST_GOTO_EXPR>\;   			{
+								BEGIN(INITIAL);
+								SET_YYLVAL(yytext);
+								return(EXPR);
+							}
+
+%{  /*********************************************************************************
+	*  それ以外の何かが入ってきた。
+	*/ %}
+<ST_GOTO_EXPR>. {	yymore(); }
+
+
 %{  /*****************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************
 	* ファイル終端処理。ここが終わり。 
 	******************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************/ %}
-<<EOF>>			{ printf("end of file\n"); return(END_OF_FILE); }
+<<EOF>>			{ // printf("end of file\n");
+					return(0); }
 
 %%
 
 #define C_OUTPUT_FILE_MAX    (256)
-extern int is_comment_locate_after;			/* コメントの挿入位置を1行遅らせる 		*/
-extern int is_generate_global_scope_code;	/* 関数の外に書かれたコードを出力する 	*/
 
+void yyerror(char const*){
+}
 /*****************************************************************************************************************************************************************
 	エントリーポイント
 ******************************************************************************************************************************************************************/
@@ -687,6 +584,8 @@ int main(int argc, char *argv[])
     char output_filne_name[C_OUTPUT_FILE_MAX] = {0};
     char input_filne_name[C_OUTPUT_FILE_MAX] = {0};
 
+	yydebug = 1;
+
     /* default name. */
     strncpy(output_filne_name, "out.puml", C_OUTPUT_FILE_MAX);
 
@@ -696,14 +595,6 @@ int main(int argc, char *argv[])
             switch(opt){
                 case 'o':
                     strncpy(output_filne_name, argv[i+1], C_OUTPUT_FILE_MAX);
-                    break;
-                case 'b':
-                	/* コメント逆順設定 */
-                    is_comment_locate_after = 0;
-                    break;
-                case 'g':
-                	/* 関数の外に書かれたコードを出力する */
-                    is_generate_global_scope_code = 1;
                     break;
                 default:
                     printf("Undefined Option.\n");

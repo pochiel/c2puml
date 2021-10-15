@@ -1,6 +1,5 @@
 @startuml
-:int main(int argc, char *argv[])
-{;
+:int main(int argc, char *argv[]) {;
 start
  	:FILE * fptr_r = NULL;;
  	:FILE * fptr_w = NULL;;
@@ -12,8 +11,8 @@ start
  	note right
 	/* default name. */
 	end note
- 	while (for(i = 0; i < argc; ++i){)
- 		if (if(*argv[i] == '-'){) then (true)
+ 	while (i = 0; i < argc; ++i){)
+ 		if (*argv[i] == '-'){) then (true)
  			:opt = *(argv[i]+1);;
  			if (switch(opt){) then (true)
  			elseif (case 'o':) then (true)
@@ -24,35 +23,13 @@ start
  				:break;;
  			endif
  			:i++;;
- 		else
- 			:sprintf(input_filne_name, "./%s", argv[i]);;
  		endif
- 	endwhile
- 	if (if ((fptr_r = fopen(input_filne_name, "r"))==NULL) {) then (true)
- 	note right
-	/* Read file pointer */
-	end note
- 		:printf("file open failed.\n");;
- 		:exit(1);;
+ 	else
+ 		:sprintf(input_filne_name, "./%s", argv[i]);;
  	endif
- 	if (if ((fptr_w = fopen(output_filne_name, "w"))==NULL) {) then (true)
- 	note right
-	/* write file pointer */
-	end note
- 		:printf("output file open failed.\n");;
- 		:exit(1);;
- 	endif
- 	:yyin = fptr_r;;
- 	note right
-	/* \•¶‰ðÍŠÖ” yyparse */
-	end note
- 	:output_file_ptr = fptr_w;;
- 	if (if( yyparse() != 0 ){) then (true)
- 		:printf("parse error.\n");;
- 	endif
- 	:fclose(fptr_r);;
- 	:fclose(fptr_w);;
- 	:return 0;;
- stop
-@enduml
+ 	:printf("file open failed.\n");;
+ 	:exit(1);;
+ 	:printf("output file open failed.\n");;
+ 	:exit(1);;
+ 	:printf("parse error.\n");;
  
