@@ -5,6 +5,8 @@
 
 extern FILE * output_file_ptr;
 extern "C" int yylex();
+extern void set_comment(const std::string &com) ;
+extern void get_comment(std::string &buf);
 
 int g_bracket_cnt = 0;
 
@@ -77,9 +79,16 @@ t_blocktype get_block_stack()	{
 
 /* 関数の終端を判別するためのカーリーブレース数カウンタ */
 static int g_function_brace_cnt = 0;
+/* コメント格納辞書の現在の先頭index */
 
-
-#define SET_YYLVAL(_b__buf__)	do{	yylval.ctype = new std::string(_b__buf__);	}while(0)
+// _b__buf__ は char *
+#define SET_YYLVAL(_b__buf__)	{							\
+	std::string temp;										\
+	get_comment(temp);										\
+	yylval.ctype = new t_token();							\
+	yylval.ctype->token_str = std::string(_b__buf__);		\
+	yylval.ctype->comment = temp;							\
+}
 
 %}
 
@@ -132,7 +141,6 @@ TYPEID          typeid
 	******************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************/ %}
 ({C_KEYWORDS}|{letter}|{white}|\*)*{white}*{letter}+{white}*\([^\(\)]*\)	{
-												printf("=================================================-func? %d\n", g_function_brace_cnt);
 												if(block_stack_index != 0) {
 													/* 関数宣言は stack 0 でのみ検出
 													（もうちょっとうまいやり方ないかなあ・・・） */
@@ -161,6 +169,7 @@ if{white}*\(				{
 								// printf("start if g_bracket_cnt=%d\n", g_bracket_cnt);
 								BEGIN(ST_IF_EXPR); 
 								g_bracket_cnt++;
+								SET_YYLVAL("");
 								return(IF);
 							}
 
@@ -218,6 +227,7 @@ if{white}*\(				{
 	*/ %}
 else						{
 								// printf("start else block\n");
+								SET_YYLVAL("");
 								return(ELSE);
 							}
 
@@ -235,6 +245,7 @@ for{white}*\(				{
 								// printf("start for g_bracket_cnt=%d\n", g_bracket_cnt);
 								BEGIN(ST_FOR_EXPR);
 								g_bracket_cnt++;
+								SET_YYLVAL("");
 								return(FOR);
 							}
 
@@ -290,6 +301,7 @@ while{white}*\(				{
 								// printf("start for g_bracket_cnt=%d\n", g_bracket_cnt);
 								BEGIN(ST_WHILE_EXPR);
 								g_bracket_cnt++;
+								SET_YYLVAL("");
 								return(WHILE);
 							}
 %{  /*********************************************************************************
@@ -330,20 +342,19 @@ while{white}*\(				{
 %{  /*****************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************
 	* コメントの検出処理
-	*	責務：コメント内容を SET_YYLVAL し、BEGIN(INITIAL) し、return(ST_COMMENT)する 
+	*	責務：コメント内容を 一次バッファに保存し、BEGIN(INITIAL) する 
 	******************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************/ %}
 "/*"            		{	BEGIN(ST_COMMENT); yymore();	}
 <ST_COMMENT>"*/"   		{	// printf("Comment(s):        (%s) len=%d\n", yytext, yyleng);
 							BEGIN(INITIAL);
-							SET_YYLVAL(yytext);
-							return(COMMENT); }
+							set_comment(std::string(yytext));
+						}
 <ST_COMMENT>"*"    		{	yymore(); }
 <ST_COMMENT>[^*]+  		{	yymore(); }
 
-"//".*(\r|\n) 			{	// printf("Comment(s):        (%s) len=%d\n", yytext, yyleng); 
-							SET_YYLVAL(yytext);
-							return(COMMENT);
+"//".*(\r|\n) 			{	// printf(f"Comment(s):        (%s) len=%d\n", yytext, yyleng); 
+							set_comment(std::string(yytext));
 						}
 
 
@@ -358,6 +369,7 @@ while{white}*\(				{
 	*/ %}
 switch{white}*			{
 							BEGIN(ST_SWITCH_EXPR); 
+							SET_YYLVAL("");
 							return(SWITCH);
 						}
 
@@ -428,6 +440,7 @@ case{white}+			{
 
 default{white}*:		{
 							// printf("Start switch case in default block\n");
+							SET_YYLVAL("");
 							return(DEFAULT);
 						}
 
@@ -440,6 +453,7 @@ default{white}*:		{
 \{						{
 							g_function_brace_cnt++;
 							//printf("start brace g_function_brace_cnt=%d\n", g_function_brace_cnt);
+							SET_YYLVAL("");
 							return(BRACE);
 						}
 
@@ -449,6 +463,7 @@ default{white}*:		{
 							if(g_function_brace_cnt==0){
 								pop_block_stack();		// 関数終了
 							}
+							SET_YYLVAL("");
 							return(END_BRACE);
 						}
 
