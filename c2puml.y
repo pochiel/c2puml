@@ -66,7 +66,7 @@ class t_token {
 %token<ctype> BRACE END_BRACE IF FOR WHILE EXPR ANY_OTHER ELSE FUNCTION ENDFUNCTION SWITCH CASE DEFAULT DO BREAK CONTINUE RETRN GOTO
 
 /* îÒèIí[ãLçÜ */
-%type<ctype> program codes block ifst forst any_other functionst switchst casest case_set_expr block_member single_line_member dowhilest retrnst
+%type<ctype> program codes block ifst forst any_other functionst switchst casest case_set_expr block_member single_line_member dowhilest retrnst breakst gotost
 
 %start program
 
@@ -98,22 +98,14 @@ codes		:	codes codes						{ $$ = new t_token(*$1 + *$2); }
 			|	forst							{ $$ = $1; }
 			|	dowhilest						{ $$ = $1; }
 			|	any_other						{ $$ = $1; }
-			|	BREAK							{ 
-													/* ébíË */
-													$1->token_str = ":break;\n";
-													$$ = $1; 
-												}
+			|	breakst							{ $$ = $1; }
 			|	CONTINUE						{
 													/* ébíË */ 
 													$1->token_str = ":continue;\n";
 													$$ = $1; 
 												}
 			|	retrnst							{ $$ = $1; }
-			|	GOTO EXPR						{
-													/* ébíË */ 
-													$1->token_str = ":goto" + $2->token_str + ";\n" + $1->get_format_comment() + "\n";
-													$$ = $1; 
-												}
+			|	gotost							{ $$ = $1; }
 			|	switchst						{ $$ = $1; }
 			;
 
@@ -126,22 +118,14 @@ block_member :	block_member block_member		{ $$ = new t_token(*$1 + *$2); }
 			|	forst							{ $$ = $1; }
 			|	dowhilest						{ $$ = $1; }
 			|	any_other						{ $$ = $1; }
-			|	BREAK							{ 
-													/* ébíË */
-													$1->token_str = ":break;\n";
-													$$ = $1; 
-												}
+			|	breakst							{ $$ = $1; }
 			|	CONTINUE						{
 													/* ébíË */ 
 													$1->token_str = ":continue;\n";
 													$$ = $1; 
 												}
 			|	retrnst							{ $$ = $1; }
-			|	GOTO EXPR						{
-													/* ébíË */ 
-													$1->token_str = ":goto" + $2->token_str + ";\n" + $1->get_format_comment() + "\n";
-													$$ = $1; 
-												}
+			|	gotost							{ $$ = $1; }
 			|	switchst						{ $$ = $1; }
 			;
 
@@ -149,22 +133,14 @@ single_line_member	:	ifst							{ $$ = $1; }
 					|	forst							{ $$ = $1; }
 					|	dowhilest						{ $$ = $1; }
 					|	any_other						{ $$ = $1; }
-					|	BREAK							{ 
-															/* ébíË */
-															$1->token_str = ":break;\n";
-															$$ = $1; 
-														}
+					|	breakst							{ $$ = $1; }
 					|	CONTINUE						{
 															/* ébíË */ 
 															$1->token_str = ":continue;\n";
 															$$ = $1; 
 														}
 					|	retrnst							{ $$ = $1; }
-					|	GOTO EXPR						{
-															/* ébíË */ 
-															$1->token_str = ":goto" + $2->token_str + ";\n" + $1->get_format_comment() + "\n";
-															$$ = $1; 
-														}
+					|	gotost							{ $$ = $1; }
 					|	switchst						{ $$ = $1; }
 					;
 
@@ -191,9 +167,8 @@ ifst		: IF EXPR block						{
 													$1->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
 																		+ $1->get_format_comment() + "\n" 
 																		+ $3->token_str + "\n"
-																		+ "elseif\n"
-																		+ $4->get_format_comment() + "\n"
-																		+ $5->token_str + "\n";
+																		+ "else" + $5->token_str + "\n"		/* elseif */
+																		+ $4->get_format_comment() + "\n";
 																		/* ññîˆîÒèIí[ãLçÜÇÃ ifst Ç≈ endifÇµÇƒÇ¢ÇÈÇÕÇ∏Ç»ÇÃÇ≈ Ç±Ç±Ç≈ÇÕ endif ÇµÇ»Ç¢ */
 													$1->comment = "";	/* ÉRÉÅÉìÉgÇÕè¡ÇµÇƒÇ®Ç≠ */
 													$$ = $1;
@@ -210,10 +185,8 @@ ifst		: IF EXPR block						{
 													$1->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
 																		+ $1->get_format_comment() + "\n" 
 																		+ $3->token_str + "\n"
-																		+ "else\n"
-																		+ $4->get_format_comment() + "\n"
-																		+ $5->token_str + "\n"
-																		+ "endif\n";
+																		+ "else" + $5->token_str + "\n"		/* elseif */
+																		+ $4->get_format_comment() + "\n";
 													$1->comment = "";	/* ÉRÉÅÉìÉgÇÕè¡ÇµÇƒÇ®Ç≠ */
 													$$ = $1;
 												}
@@ -345,11 +318,30 @@ any_other	:	ANY_OTHER		{
 /* return */
 retrnst		:	RETRN EXPR		{
 									$1->token_str = 	":return " + $2->token_str + ";\n" 
-														+ $1->get_format_comment() + "\n";
+														+ $1->get_format_comment() + "\n"
+														+ "stop\n";
 									$1->comment = "";	/* ÉRÉÅÉìÉgÇÕè¡ÇµÇƒÇ®Ç≠ */
 									$$ = $1;
 								}
 			;
+
+/* break */
+breakst		:	BREAK			{ 
+									$1->token_str = ":break;\n"
+													+ $1->get_format_comment() + "\n"
+													+ "break\n";
+									$1->comment = "";	/* ÉRÉÅÉìÉgÇÕè¡ÇµÇƒÇ®Ç≠ */
+									$$ = $1; 
+								}
+
+/* goto */
+gotost		:	GOTO EXPR		{
+									$1->token_str = ":goto" + $2->token_str + ";\n"
+													+ $1->get_format_comment() + "\n"
+													+ "(" + $2->token_str +")\n"
+													+ "detach\n";
+									$$ = $1; 
+								}
 %%
 
 static std::string g_comment_buf;
