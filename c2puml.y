@@ -63,7 +63,7 @@ class t_token {
 
 %defines
 /* 終端記号 */
-%token<ctype> BRACE END_BRACE IF FOR WHILE EXPR ANY_OTHER ELSE FUNCTION ENDFUNCTION SWITCH CASE DEFAULT DO BREAK CONTINUE RETRN GOTO
+%token<ctype> BRACE END_BRACE IF FOR WHILE EXPR ANY_OTHER ELSE FUNCTION ENDFUNCTION SWITCH CASE DEFAULT DO BREAK CONTINUE RETRN GOTO PROTOTYPE
 
 /* 非終端記号 */
 %type<ctype> program codes block ifst forst any_other functionst switchst casest case_set_expr block_member single_line_member dowhilest retrnst breakst gotost
@@ -76,6 +76,7 @@ class t_token {
 program		:	functionst						{ $$ = $1; }
 			|	any_other						{ $$ = $1; }
 			|	program program					{ $$ = new t_token(*$1 + *$2); }
+			|	PROTOTYPE						{ }
 			;
 
 /* 関数とはなんぞや */
@@ -87,6 +88,18 @@ functionst	:	FUNCTION BRACE codes END_BRACE	{
 																					+ ($3->token_str) + "\n"
 																					+ ($3->get_format_comment()) + "\n" 
 																					+ "stop\n"
+																					+ "@enduml\n";
+														output_to_file(output_str);
+													}
+			|	FUNCTION BRACE codes retrnst END_BRACE	{
+														std::string output_str = "@startuml\n:"
+																					+ ($1->token_str) + ";\n" 
+																					+ ($1->get_format_comment()) + "\n" 
+																					+ "start\n" 
+																					+ ($3->token_str) + "\n"
+																					+ ($3->get_format_comment()) + "\n" 
+																					+ ($4->token_str) + "\n"
+																					+ ($4->get_format_comment()) + "\n" 
 																					+ "@enduml\n";
 														output_to_file(output_str);
 													}
@@ -185,8 +198,10 @@ ifst		: IF EXPR block						{
 													$1->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
 																		+ $1->get_format_comment() + "\n" 
 																		+ $3->token_str + "\n"
-																		+ "else" + $5->token_str + "\n"		/* elseif */
-																		+ $4->get_format_comment() + "\n";
+																		+ "else \n"
+																		+ $4->get_format_comment() + "\n"
+																		+ $5->token_str + "\n"
+																		+ "endif\n";
 													$1->comment = "";	/* コメントは消しておく */
 													$$ = $1;
 												}
@@ -194,9 +209,8 @@ ifst		: IF EXPR block						{
 													$1->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
 																		+ $1->get_format_comment() + "\n" 
 																		+ $3->token_str + "\n"
-																		+ "elseif\n"
-																		+ $4->get_format_comment() + "\n"
-																		+ $5->token_str + "\n";
+																		+ "else" + $5->token_str + "\n"		/* elseif */
+																		+ $4->get_format_comment() + "\n";
 																		/* 末尾非終端記号の ifst で endifしているはずなので ここでは endif しない */
 													$1->comment = "";	/* コメントは消しておく */
 													$$ = $1;
