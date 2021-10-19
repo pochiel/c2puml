@@ -4,9 +4,14 @@
 #include <stdlib.h>
 #include <string>
 #include <iostream>
+#include <map>
+#include <regex>
 
 void output_to_file(std::string &);
 void get_comment(std::string &buf);
+std::string get_connector(std::string orig_label) ;
+void clear_connector_list() ;
+
 uint32_t get_comment_index();
 #define YYDEBUG 1
 
@@ -63,10 +68,10 @@ class t_token {
 
 %defines
 /* 終端記号 */
-%token<ctype> BRACE END_BRACE IF FOR WHILE EXPR ANY_OTHER ELSE FUNCTION ENDFUNCTION SWITCH CASE DEFAULT DO BREAK CONTINUE RETRN GOTO PROTOTYPE
+%token<ctype> BRACE END_BRACE IF FOR WHILE EXPR ANY_OTHER ELSE FUNCTION ENDFUNCTION SWITCH CASE DEFAULT DO BREAK CONTINUE RETRN GOTO PROTOTYPE LABEL
 
 /* 非終端記号 */
-%type<ctype> program codes block ifst forst any_other functionst switchst casest case_set_expr block_member single_line_member dowhilest retrnst breakst gotost
+%type<ctype> program codes block ifst forst any_other functionst switchst casest case_set_expr block_member single_line_member dowhilest retrnst breakst gotost labelst
 
 %start program
 
@@ -90,6 +95,7 @@ functionst	:	FUNCTION BRACE codes END_BRACE	{
 																					+ "stop\n"
 																					+ "@enduml\n";
 														output_to_file(output_str);
+														clear_connector_list();
 													}
 			|	FUNCTION BRACE codes retrnst END_BRACE	{
 														std::string output_str = "@startuml\n:"
@@ -102,6 +108,7 @@ functionst	:	FUNCTION BRACE codes END_BRACE	{
 																					+ ($4->get_format_comment()) + "\n" 
 																					+ "@enduml\n";
 														output_to_file(output_str);
+														clear_connector_list();
 													}
 			;
 
@@ -120,6 +127,7 @@ codes		:	codes codes						{ $$ = new t_token(*$1 + *$2); }
 			|	retrnst							{ $$ = $1; }
 			|	gotost							{ $$ = $1; }
 			|	switchst						{ $$ = $1; }
+			|	labelst							{ $$ = $1; }
 			;
 
 block		:	BRACE block_member END_BRACE	{ $$ = $2; }
@@ -352,10 +360,20 @@ breakst		:	BREAK			{
 gotost		:	GOTO EXPR		{
 									$1->token_str = ":goto" + $2->token_str + ";\n"
 													+ $1->get_format_comment() + "\n"
-													+ "(" + $2->token_str +")\n"
+													+ "(" + get_connector($2->token_str) +")\n"
 													+ "detach\n";
+									$1->comment = "";	/* コメントは消しておく */
 									$$ = $1; 
 								}
+
+/* goto label */
+labelst		:	LABEL		{
+									$1->token_str = "(" + get_connector($1->token_str) + ")\n"
+													+ $1->get_format_comment() + "\n";
+									$1->comment = "";	/* コメントは消しておく */
+									$$ = $1; 
+								}
+
 %%
 
 static std::string g_comment_buf;
@@ -371,4 +389,25 @@ void get_comment(std::string &buf) {
 
 void output_to_file(std::string &msg){
 	fprintf(output_file_ptr, "%s", msg.c_str()); // ファイルに書く
+}
+
+std::map <std::string, std::string> g_connector_map;
+int connector_index = 0;
+std::string get_connector(std::string orig_label) {
+	std::string ret = "";
+	orig_label = std::regex_replace(orig_label, std::regex("(:|;)"), "");
+	std::cout << "orig_label : " << orig_label << "\n";
+	std::cout << "orig_label.count : " << g_connector_map.count(orig_label) << "\n";
+	if(g_connector_map.count(orig_label) == 0){
+		ret = (char)('a'+(connector_index++));
+		g_connector_map[orig_label] = ret;
+	} else {
+		ret = g_connector_map[orig_label];	
+	}
+	return ret;
+}
+
+void clear_connector_list() {
+	g_connector_map.clear();
+	connector_index=0;
 }
