@@ -10,42 +10,6 @@ extern void get_comment(std::string &buf);
 
 int g_bracket_cnt = 0;
 
-enum {
-	C_UNRELATED_ELSE = 0,
-	C_WITH_ELSE_SINGLE,
-	C_WITH_ELSE_BLOCK,
-};
-
-enum {
-	C_UNRELATED_WHILE = 0,
-	C_WITH_BLOCK,
-	C_WITHOUT_BLOCK,
-};
-
-// if節がどのように始まったかを記憶しておくフラグ、現在のブロックが { ありか、なしかを示す。
-// { の無いシングル if の場合、１行後にすぐ endif もしくは else しないといけない。
-int is_else_in_if = C_UNRELATED_ELSE;
-
-// for節がどのように始まったかを記憶しておくフラグ、現在のブロックが { ありか、なしかを示す。
-// { の無いシングル for の場合、１行後にすぐ endforしなければならない。
-int is_block_of_for = C_UNRELATED_WHILE;
-
-/* 指定した任意の1文字を削除する */
-void remove_char(char target, char converted_char, char* in_str, int in_length){
-	for(int i=0;i<in_length;i++){
-		if( in_str[i] == target ){
-			in_str[i] = converted_char;
-		}
-	}
-}
-
-/* 改行を削除する */
-void remove_line_feed(const char* in_str, int in_length, char* out_str, int *out_length){
-	sprintf(out_str, "%s", in_str);
-	remove_char('\n', ' ', out_str, in_length);
-	remove_char('\r', ' ', out_str, in_length);
-}
-
 /* ブロック情報保持スタック */
 typedef enum {
 	C_BLOCK_TYPE_NONE = 0,
@@ -57,8 +21,6 @@ typedef enum {
 	C_BLOCK_TYPE_WRONG = -10,
 } t_blocktype;
 #define MAX_OF_BLOCK_STACK	(128)
-
-
 
 t_blocktype block_stack[MAX_OF_BLOCK_STACK] = {C_BLOCK_TYPE_NONE};
 int block_stack_index = 0;
