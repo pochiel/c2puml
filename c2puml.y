@@ -54,7 +54,9 @@ class t_token {
 	//  +演算子のオーバーロード
 	t_token operator+(const t_token& t2) {
 		t_token ret;
+		std::cout << "***************************************" << this->token_str << "################33 " << t2.token_str;
 		ret.token_str = this->token_str + t2.token_str;
+		std::cout << "ssssssssssssss " << ret.token_str << "eeeeeeeeeeeeeee\n";
 		ret.comment = this->comment + t2.comment;
 		return ret;
 	}
@@ -80,7 +82,7 @@ class t_token {
 /* プログラムとはなんぞや */
 program		:	functionst						{ $$ = $1; }
 			|	any_other						{ $$ = $1; }
-			|	program program					{ $$ = new t_token(*$1 + *$2); }
+			|	program program					{ std::cout << "========== program program\n" ; $$ = new t_token(*$1 + *$2); }
 			|	PROTOTYPE						{ }
 			;
 
@@ -92,37 +94,28 @@ functionst	:	FUNCTION BRACE codes END_BRACE	{
 																					+ "start\n" 
 																					+ ($3->token_str) + "\n"
 																					+ ($3->get_format_comment()) + "\n" 
-																					+ "stop\n"
-																					+ "@enduml\n";
-														output_to_file(output_str);
-														clear_connector_list();
-													}
-			|	FUNCTION BRACE codes retrnst END_BRACE	{
-														std::string output_str = "@startuml\n:"
-																					+ ($1->token_str) + ";\n" 
-																					+ ($1->get_format_comment()) + "\n" 
-																					+ "start\n" 
-																					+ ($3->token_str) + "\n"
-																					+ ($3->get_format_comment()) + "\n" 
-																					+ ($4->token_str) + "\n"
-																					+ ($4->get_format_comment()) + "\n" 
 																					+ "@enduml\n";
 														output_to_file(output_str);
 														clear_connector_list();
 													}
 			;
 
-codes		:	codes codes						{ $$ = new t_token(*$1 + *$2); }
+codes		:	codes codes						{ 
+													std::cout << "========== codes codes\n" ; $$ = new t_token(*$1 + *$2); 
+									std::cout << "++++++++++++++++++++++++++++++++++++ codes codes:" << $$->token_str << "\n";	}	
 			|	block							{ $$ = $1; }
 			|	ifst							{ $$ = $1; }
 			|	forst							{ $$ = $1; }
 			|	dowhilest						{ $$ = $1; }
-			|	any_other						{ $$ = $1; }
+			|	any_other						{ 
+									std::cout << "++++++++++++++++++++++++++++++++++++ codes:" << $1->token_str << "\n";	
+				$$ = $1; }
 			|	breakst							{ $$ = $1; }
 			|	CONTINUE						{
 													/* 暫定 */ 
-													$1->token_str = ":continue;\n";
-													$$ = $1; 
+													t_token *ret = new t_token();;
+													ret->token_str = ":continue;\n";
+													$$ = ret; 
 												}
 			|	retrnst							{ $$ = $1; }
 			|	gotost							{ $$ = $1; }
@@ -131,10 +124,10 @@ codes		:	codes codes						{ $$ = new t_token(*$1 + *$2); }
 			;
 
 block		:	BRACE block_member END_BRACE	{ $$ = $2; }
-			|	BRACE END_BRACE					{ $$ = new t_token(*$1 + *$2); }
+			|	BRACE END_BRACE					{ std::cout << "========== brace end_brace\n" ; $$ = new t_token(*$1 + *$2); }
 			;
 
-block_member :	block_member block_member		{ $$ = new t_token(*$1 + *$2); }
+block_member :	block_member block_member		{ std::cout << "========== block_mem block_mem\n" ; $$ = new t_token(*$1 + *$2); }
 			|	ifst							{ $$ = $1; }
 			|	forst							{ $$ = $1; }
 			|	dowhilest						{ $$ = $1; }
@@ -142,8 +135,9 @@ block_member :	block_member block_member		{ $$ = new t_token(*$1 + *$2); }
 			|	breakst							{ $$ = $1; }
 			|	CONTINUE						{
 													/* 暫定 */ 
-													$1->token_str = ":continue;\n";
-													$$ = $1; 
+													t_token *ret = new t_token();;
+													ret->token_str = ":continue;\n";
+													$$ = ret; 
 												}
 			|	retrnst							{ $$ = $1; }
 			|	gotost							{ $$ = $1; }
@@ -157,8 +151,9 @@ single_line_member	:	ifst							{ $$ = $1; }
 					|	breakst							{ $$ = $1; }
 					|	CONTINUE						{
 															/* 暫定 */ 
-															$1->token_str = ":continue;\n";
-															$$ = $1; 
+															t_token *ret = new t_token();;
+															ret->token_str = ":continue;\n";
+															$$ = ret; 
 														}
 					|	retrnst							{ $$ = $1; }
 					|	gotost							{ $$ = $1; }
@@ -166,212 +161,238 @@ single_line_member	:	ifst							{ $$ = $1; }
 					;
 
 ifst		: IF EXPR block						{
-													$1->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
+													t_token *ret = new t_token();;
+													ret->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
 																		+ $1->get_format_comment() + "\n" 
 																		+ $3->token_str + "\n"
 																		+ "endif\n";
-													$1->comment = "";	/* コメントは消しておく */
-													$$ = $1;
+													ret->comment = "";	/* コメントは消しておく */
+													$$ = ret;
 												}
 			| IF EXPR block ELSE block			{
-													$1->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
+													t_token *ret = new t_token();;
+													ret->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
 																		+ $1->get_format_comment() + "\n" 
 																		+ $3->token_str + "\n"
 																		+ "else\n"
 																		+ $4->get_format_comment() + "\n"
 																		+ $5->token_str + "\n"
 																		+ "endif\n";
-													$1->comment = "";	/* コメントは消しておく */
-													$$ = $1;
+													ret->comment = "";	/* コメントは消しておく */
+													$$ = ret;
 												}
 			| IF EXPR block ELSE ifst			{
-													$1->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
+													t_token *ret = new t_token();;
+													ret->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
 																		+ $1->get_format_comment() + "\n" 
 																		+ $3->token_str + "\n"
 																		+ "else" + $5->token_str + "\n"		/* elseif */
 																		+ $4->get_format_comment() + "\n";
 																		/* 末尾非終端記号の ifst で endifしているはずなので ここでは endif しない */
-													$1->comment = "";	/* コメントは消しておく */
-													$$ = $1;
+													ret->comment = "";	/* コメントは消しておく */
+													$$ = ret;
 												}
 			| IF EXPR single_line_member		{
-													$1->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
+													t_token *ret = new t_token();;
+													ret->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
 																		+ $1->get_format_comment() + "\n" 
 																		+ $3->token_str + "\n"
 																		+ "endif\n";
-													$1->comment = "";	/* コメントは消しておく */
-													$$ = $1;
+													ret->comment = "";	/* コメントは消しておく */
+													$$ = ret;
 												}
 			| IF EXPR single_line_member ELSE single_line_member		{
-													$1->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
+													t_token *ret = new t_token();;
+													ret->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
 																		+ $1->get_format_comment() + "\n" 
 																		+ $3->token_str + "\n"
 																		+ "else \n"
 																		+ $4->get_format_comment() + "\n"
 																		+ $5->token_str + "\n"
 																		+ "endif\n";
-													$1->comment = "";	/* コメントは消しておく */
-													$$ = $1;
+													ret->comment = "";	/* コメントは消しておく */
+													$$ = ret;
 												}
 			| IF EXPR single_line_member ELSE ifst		{
-													$1->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
+													t_token *ret = new t_token();;
+													ret->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
 																		+ $1->get_format_comment() + "\n" 
 																		+ $3->token_str + "\n"
 																		+ "else" + $5->token_str + "\n"		/* elseif */
 																		+ $4->get_format_comment() + "\n";
 																		/* 末尾非終端記号の ifst で endifしているはずなので ここでは endif しない */
-													$1->comment = "";	/* コメントは消しておく */
-													$$ = $1;
+													ret->comment = "";	/* コメントは消しておく */
+													$$ = ret;
 												}
 			;
 
 forst   :   FOR EXPR block						{
-													$1->token_str = 	"while (" + $2->token_str + ")\n" 
+													t_token *ret = new t_token();;
+													ret->token_str = 	"while (" + $2->token_str + ")\n" 
 																		+ $1->get_format_comment() + "\n" 
 																		+ $3->token_str + "\n"
 																		+ "end while\n";
-													$1->comment = "";	/* コメントは消しておく */
-													$$ = $1;
+													ret->comment = "";	/* コメントは消しておく */
+													$$ = ret;
 												}
 		|	WHILE EXPR block					{
-													$1->token_str = 	"while (" + $2->token_str + ")\n" 
+													t_token *ret = new t_token();;
+													ret->token_str = 	"while (" + $2->token_str + ")\n" 
 																		+ $1->get_format_comment() + "\n" 
 																		+ $3->token_str + "\n"
 																		+ "end while\n";
-													$1->comment = "";	/* コメントは消しておく */
-													$$ = $1;
+													ret->comment = "";	/* コメントは消しておく */
+													$$ = ret;
 												}
 		|	FOR EXPR single_line_member			{
-													$1->token_str = 	"while (" + $2->token_str + ")\n" 
+													t_token *ret = new t_token();;
+													ret->token_str = 	"while (" + $2->token_str + ")\n" 
 																		+ $1->get_format_comment() + "\n" 
 																		+ $3->token_str + "\n"
 																		+ "end while\n";
-													$1->comment = "";	/* コメントは消しておく */
-													$$ = $1;
+													ret->comment = "";	/* コメントは消しておく */
+													$$ = ret;
 												}
 		|	WHILE EXPR single_line_member		{
-													$1->token_str = 	"while (" + $2->token_str + ")\n" 
+													t_token *ret = new t_token();;
+													ret->token_str = 	"while (" + $2->token_str + ")\n" 
 																		+ $1->get_format_comment() + "\n" 
 																		+ $3->token_str + "\n"
 																		+ "end while\n";
-													$1->comment = "";	/* コメントは消しておく */
-													$$ = $1;
+													ret->comment = "";	/* コメントは消しておく */
+													$$ = ret;
 												}
         ;
 
 dowhilest	: DO block WHILE EXPR			{
-													$1->token_str = 	"repeat\n"
+													t_token *ret = new t_token();;
+													ret->token_str = 	"repeat\n"
 																		+ $1->get_format_comment() + "\n" 
 																		+ $2->token_str + "\n" 
 																		+ "repeat while(" + $4->token_str + ")\n"
 																		+ $3->get_format_comment() + "\n" ;
-													$1->comment = "";	/* コメントは消しておく */
-													$$ = $1;
+													ret->comment = "";	/* コメントは消しておく */
+													$$ = ret;
 											}
 			;
 
 switchst	: SWITCH EXPR BRACE casest END_BRACE	 {
-														$1->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
+														t_token *ret = new t_token();;
+														ret->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
 																			+ $1->get_format_comment() + "\n" 
 																			+ $4->token_str + "\n"
 																			+ "endif\n";
-														$1->comment = "";	/* コメントは消しておく */
-														$$ = $1;
+														ret->comment = "";	/* コメントは消しておく */
+														$$ = ret;
 													}
 			;
 
 /* case が連続して並んでいるときのパターン */
 case_set_expr : CASE EXPR							{
-														$1->token_str 	= 	"(" + $2->token_str + ")";
-														/* コメントは case 側が有効なので、削除しない */
-														$$ = $1;
+														t_token *ret = new t_token();;
+														ret->token_str 	= 	"(" + $2->token_str + ")";
+														ret->comment		=	$1->comment;
+														$$ = ret;
 													}
 			| case_set_expr CASE EXPR 				{
-														$1->token_str 	= 	"(" + $1->token_str + ") or (" + $3->token_str + ")";
-														$1->comment		=	$1->comment  + "\n" + $3->comment;
-														$$ = $1;
+														t_token *ret = new t_token();;
+														ret->token_str 	= 	"(" + $1->token_str + ") or (" + $3->token_str + ")";
+														ret->comment		=	$1->comment  + "\n" + $3->comment;
+														$$ = ret;
 													}
 			;
 			
 casest		: case_set_expr codes					{
-														$1->token_str = 	"elseif (" + $1->token_str + ") then (true)\n" 
+														t_token *ret = new t_token();;
+														ret->token_str = 	"elseif (" + $1->token_str + ") then (true)\n" 
 																			+ $1->get_format_comment() + "\n" 
 																			+ $2->token_str + "\n";
-														$1->comment = "";	/* コメントは消しておく */
-														$$ = $1;
+														ret->comment = "";	/* コメントは消しておく */
+														$$ = ret;
 													}
 			| case_set_expr codes casest			{
-														$1->token_str = 	"elseif (" + $1->token_str + ") then (true)\n" 
+														t_token *ret = new t_token();;
+														ret->token_str = 	"elseif (" + $1->token_str + ") then (true)\n" 
 																			+ $1->get_format_comment() + "\n" 
 																			+ $2->token_str + "\n"
 																			+ $3->token_str + "\n";
-														$1->comment = "";	/* コメントは消しておく */
-														$$ = $1;
+														ret->comment = "";	/* コメントは消しておく */
+														$$ = ret;
 													}
 			| casest DEFAULT codes					{
-														$1->token_str = 	$1->token_str + "\n"
+														t_token *ret = new t_token();;
+														ret->token_str = 	$1->token_str + "\n"
 																			+ "else\n"
 																			+ $2->get_format_comment()
 																			+ $3->token_str + "\n";
-														$1->comment = "";	/* コメントは消しておく */
-														$$ = $1;
+														ret->comment = "";	/* コメントは消しておく */
+														$$ = ret;
 													}
 			| case_set_expr DEFAULT codes			{
-														$1->token_str = 	"elseif (" + $1->token_str + ") then (true)\n" 
+														t_token *ret = new t_token();;
+														ret->token_str = 	"elseif (" + $1->token_str + ") then (true)\n" 
 																			+ $1->get_format_comment() + "\n" 
 																			+ $3->token_str + "\n";
 																			+ "else\n"
 																			+ $2->get_format_comment() + "\n"
 																			+ $3->token_str + "\n";
-														$1->comment = "";	/* コメントは消しておく */
-														$$ = $1;
+														ret->comment = "";	/* コメントは消しておく */
+														$$ = ret;
 													}
 			;
 
 /* その他はそのまま載せる */
 any_other	:	ANY_OTHER		{
-									$1->token_str = 	":" + $1->token_str + ";\n" 
+									t_token *ret = new t_token();;
+									std::cout << "++++++++++++++++++++++++++++++++++++ any other:" << $1->token_str << "\n";	
+									ret->token_str = 	":" + $1->token_str + ";\n" 
 														+ $1->get_format_comment() + "\n";
-									$1->comment = "";	/* コメントは消しておく */
-									$$ = $1;
+									ret->comment = "";	/* コメントは消しておく */
+									$$ = ret;
 								}
 			;
 
 /* return */
 retrnst		:	RETRN EXPR		{
-									$1->token_str = 	":return " + $2->token_str + ";\n" 
+									t_token *ret = new t_token();;
+									ret->token_str = 	":return " + $2->token_str + ";\n" 
 														+ $1->get_format_comment() + "\n"
 														+ "stop\n";
-									$1->comment = "";	/* コメントは消しておく */
-									$$ = $1;
+									ret->comment = "";	/* コメントは消しておく */
+									$$ = ret;
+									std::cout << "++++++  retrnst  ++++++ any other:" << $$->token_str << "\n";	
+									std::cout << "++++++  retrnst  ++++++ any other:" << $$->comment << "\n";	
 								}
 			;
 
 /* break */
 breakst		:	BREAK			{ 
-									$1->token_str = ":break;\n"
+									t_token *ret = new t_token();;
+									ret->token_str = ":break;\n"
 													+ $1->get_format_comment() + "\n"
 													+ "break\n";
-									$1->comment = "";	/* コメントは消しておく */
-									$$ = $1; 
+									ret->comment = "";	/* コメントは消しておく */
+									$$ = ret; 
 								}
 
 /* goto */
 gotost		:	GOTO EXPR		{
-									$1->token_str = ":goto" + $2->token_str + ";\n"
+									t_token *ret = new t_token();;
+									ret->token_str = ":goto " + $2->token_str + ";\n"
 													+ $1->get_format_comment() + "\n"
 													+ "(" + get_connector($2->token_str) +")\n"
 													+ "detach\n";
-									$1->comment = "";	/* コメントは消しておく */
-									$$ = $1; 
+									ret->comment = "";	/* コメントは消しておく */
+									$$ = ret; 
 								}
 
 /* goto label */
 labelst		:	LABEL		{
-									$1->token_str = "(" + get_connector($1->token_str) + ")\n"
+									t_token *ret = new t_token();;
+									ret->token_str = "(" + get_connector($1->token_str) + ")\n"
 													+ $1->get_format_comment() + "\n";
-									$1->comment = "";	/* コメントは消しておく */
-									$$ = $1; 
+									ret->comment = "";	/* コメントは消しておく */
+									$$ = ret; 
 								}
 
 %%
