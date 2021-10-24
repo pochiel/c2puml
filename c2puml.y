@@ -54,9 +54,7 @@ class t_token {
 	//  +演算子のオーバーロード
 	t_token operator+(const t_token& t2) {
 		t_token ret;
-		std::cout << "***************************************" << this->token_str << "################33 " << t2.token_str;
 		ret.token_str = this->token_str + t2.token_str;
-		std::cout << "ssssssssssssss " << ret.token_str << "eeeeeeeeeeeeeee\n";
 		ret.comment = this->comment + t2.comment;
 		return ret;
 	}
@@ -82,7 +80,7 @@ class t_token {
 /* プログラムとはなんぞや */
 program		:	functionst						{ $$ = $1; }
 			|	any_other						{ $$ = $1; }
-			|	program program					{ std::cout << "========== program program\n" ; $$ = new t_token(*$1 + *$2); }
+			|	program program					{ $$ = new t_token(*$1 + *$2); }
 			|	PROTOTYPE						{ }
 			;
 
@@ -100,16 +98,12 @@ functionst	:	FUNCTION BRACE codes END_BRACE	{
 													}
 			;
 
-codes		:	codes codes						{ 
-													std::cout << "========== codes codes\n" ; $$ = new t_token(*$1 + *$2); 
-									std::cout << "++++++++++++++++++++++++++++++++++++ codes codes:" << $$->token_str << "\n";	}	
+codes		:	codes codes						{ $$ = new t_token(*$1 + *$2); }	
 			|	block							{ $$ = $1; }
 			|	ifst							{ $$ = $1; }
 			|	forst							{ $$ = $1; }
 			|	dowhilest						{ $$ = $1; }
-			|	any_other						{ 
-									std::cout << "++++++++++++++++++++++++++++++++++++ codes:" << $1->token_str << "\n";	
-				$$ = $1; }
+			|	any_other						{ $$ = $1; }
 			|	breakst							{ $$ = $1; }
 			|	CONTINUE						{
 													/* 暫定 */ 
@@ -124,10 +118,10 @@ codes		:	codes codes						{
 			;
 
 block		:	BRACE block_member END_BRACE	{ $$ = $2; }
-			|	BRACE END_BRACE					{ std::cout << "========== brace end_brace\n" ; $$ = new t_token(*$1 + *$2); }
+			|	BRACE END_BRACE					{ $$ = new t_token(*$1 + *$2); }
 			;
 
-block_member :	block_member block_member		{ std::cout << "========== block_mem block_mem\n" ; $$ = new t_token(*$1 + *$2); }
+block_member :	block_member block_member		{ $$ = new t_token(*$1 + *$2); }
 			|	ifst							{ $$ = $1; }
 			|	forst							{ $$ = $1; }
 			|	dowhilest						{ $$ = $1; }
@@ -344,7 +338,6 @@ casest		: case_set_expr codes					{
 /* その他はそのまま載せる */
 any_other	:	ANY_OTHER		{
 									t_token *ret = new t_token();;
-									std::cout << "++++++++++++++++++++++++++++++++++++ any other:" << $1->token_str << "\n";	
 									ret->token_str = 	":" + $1->token_str + ";\n" 
 														+ $1->get_format_comment() + "\n";
 									ret->comment = "";	/* コメントは消しておく */
@@ -360,8 +353,6 @@ retrnst		:	RETRN EXPR		{
 														+ "stop\n";
 									ret->comment = "";	/* コメントは消しておく */
 									$$ = ret;
-									std::cout << "++++++  retrnst  ++++++ any other:" << $$->token_str << "\n";	
-									std::cout << "++++++  retrnst  ++++++ any other:" << $$->comment << "\n";	
 								}
 			;
 
@@ -417,8 +408,6 @@ int connector_index = 0;
 std::string get_connector(std::string orig_label) {
 	std::string ret = "";
 	orig_label = std::regex_replace(orig_label, std::regex("(:|;)"), "");
-	std::cout << "orig_label : " << orig_label << "\n";
-	std::cout << "orig_label.count : " << g_connector_map.count(orig_label) << "\n";
 	if(g_connector_map.count(orig_label) == 0){
 		ret = (char)('a'+(connector_index++));
 		g_connector_map[orig_label] = ret;
