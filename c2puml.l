@@ -74,6 +74,7 @@ other_cr	[[.]]
 %x ST_CASE_EXPR
 %x ST_RETRN_EXPR
 %x ST_GOTO_EXPR
+%x ST_TYPEDEF
 
 
 TYPE            void|char|int|float|double|short|long|signed|unsigned|sizeof
@@ -125,10 +126,33 @@ TYPEID          typeid
 													// printf("[Info] prototype def rejected.\n");
 													REJECT;
 												} else {
-													SET_YYLVAL(yytext);
-													return(PROTOTYPE);
+													// SET_YYLVAL(yytext);
+													// return(PROTOTYPE);
 												}
 											}
+
+%{  /*********************************************************************************
+	* 構造体宣言など
+	*/ %}
+{TYPEDEF}+({TYPEDEF}|{white})*{white}*{letter}*{white}*\{							{
+												if(block_stack_index != 0) {
+													/* 構造体宣言は stack 0 でのみ検出
+													（もうちょっとうまいやり方ないかなあ・・・） */
+													REJECT;
+												} else {
+													printf("[Info] struct def.\n");
+													BEGIN(ST_TYPEDEF); 
+												}
+}
+
+<ST_TYPEDEF>\}+{white}*{letter}*{white}*;				{
+								printf("[Info] struct def:\n%s", yytext);
+								BEGIN(INITIAL); 
+							}
+
+<ST_TYPEDEF>.				{
+								yymore();
+							}
 
 #.+[\r\n]
 
