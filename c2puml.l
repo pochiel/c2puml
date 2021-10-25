@@ -7,6 +7,8 @@ extern FILE * output_file_ptr;
 extern "C" int yylex();
 extern void set_comment(const std::string &com) ;
 extern void get_comment(std::string &buf);
+extern int yyparse();
+extern int yydebug;
 
 int g_bracket_cnt = 0;
 

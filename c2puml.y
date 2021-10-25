@@ -122,6 +122,7 @@ block		:	BRACE block_member END_BRACE	{ $$ = $2; }
 			;
 
 block_member :	block_member block_member		{ $$ = new t_token(*$1 + *$2); }
+			|	block							{ $$ = $1; }
 			|	ifst							{ $$ = $1; }
 			|	forst							{ $$ = $1; }
 			|	dowhilest						{ $$ = $1; }
@@ -157,7 +158,7 @@ single_line_member	:	ifst							{ $$ = $1; }
 ifst		: IF EXPR block						{
 													t_token *ret = new t_token();;
 													ret->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
-																		+ $1->get_format_comment() + "\n" 
+																		+ ($1->get_format_comment() == "" ? "" : ": ;\n" + $1->get_format_comment() + "\n") 
 																		+ $3->token_str + "\n"
 																		+ "endif\n";
 													ret->comment = "";	/* コメントは消しておく */
@@ -166,10 +167,10 @@ ifst		: IF EXPR block						{
 			| IF EXPR block ELSE block			{
 													t_token *ret = new t_token();;
 													ret->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
-																		+ $1->get_format_comment() + "\n" 
+																		+ ($1->get_format_comment() == "" ? "" : ": ;\n" + $1->get_format_comment() + "\n")
 																		+ $3->token_str + "\n"
 																		+ "else\n"
-																		+ $4->get_format_comment() + "\n"
+																		+ ($4->get_format_comment() == "" ? "" : ": ;\n" + $4->get_format_comment() + "\n")
 																		+ $5->token_str + "\n"
 																		+ "endif\n";
 													ret->comment = "";	/* コメントは消しておく */
@@ -178,18 +179,18 @@ ifst		: IF EXPR block						{
 			| IF EXPR block ELSE ifst			{
 													t_token *ret = new t_token();;
 													ret->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
-																		+ $1->get_format_comment() + "\n" 
+																		+ ($1->get_format_comment() == "" ? "" : ": ;\n" + $1->get_format_comment() + "\n") 
 																		+ $3->token_str + "\n"
 																		+ "else" + $5->token_str + "\n"		/* elseif */
-																		+ $4->get_format_comment() + "\n";
-																		/* 末尾非終端記号の ifst で endifしているはずなので ここでは endif しない */
+																		+ ($4->get_format_comment() == "" ? "" : ": ;\n" + $4->get_format_comment() + "\n");
+													/* 末尾非終端記号の ifst で endifしているはずなので ここでは endif しない */
 													ret->comment = "";	/* コメントは消しておく */
 													$$ = ret;
 												}
 			| IF EXPR single_line_member		{
 													t_token *ret = new t_token();;
 													ret->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
-																		+ $1->get_format_comment() + "\n" 
+																		+ ($1->get_format_comment() == "" ? "" : ": ;\n" + $1->get_format_comment() + "\n") 
 																		+ $3->token_str + "\n"
 																		+ "endif\n";
 													ret->comment = "";	/* コメントは消しておく */
@@ -198,10 +199,10 @@ ifst		: IF EXPR block						{
 			| IF EXPR single_line_member ELSE single_line_member		{
 													t_token *ret = new t_token();;
 													ret->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
-																		+ $1->get_format_comment() + "\n" 
+																		+ ($1->get_format_comment() == "" ? "" : ": ;\n" + $1->get_format_comment() + "\n")
 																		+ $3->token_str + "\n"
 																		+ "else \n"
-																		+ $4->get_format_comment() + "\n"
+																		+ ($4->get_format_comment() == "" ? "" : ": ;\n" + $4->get_format_comment() + "\n")
 																		+ $5->token_str + "\n"
 																		+ "endif\n";
 													ret->comment = "";	/* コメントは消しておく */
@@ -210,11 +211,11 @@ ifst		: IF EXPR block						{
 			| IF EXPR single_line_member ELSE ifst		{
 													t_token *ret = new t_token();;
 													ret->token_str = 	"if (" + $2->token_str + ") then (true)\n" 
-																		+ $1->get_format_comment() + "\n" 
+																		+ ($1->get_format_comment() == "" ? "" : ": ;\n" + $1->get_format_comment() + "\n")
 																		+ $3->token_str + "\n"
 																		+ "else" + $5->token_str + "\n"		/* elseif */
-																		+ $4->get_format_comment() + "\n";
-																		/* 末尾非終端記号の ifst で endifしているはずなので ここでは endif しない */
+																		+ ($4->get_format_comment() == "" ? "" : ": ;\n" + $4->get_format_comment() + "\n");
+													/* 末尾非終端記号の ifst で endifしているはずなので ここでは endif しない */
 													ret->comment = "";	/* コメントは消しておく */
 													$$ = ret;
 												}
@@ -359,9 +360,9 @@ retrnst		:	RETRN EXPR		{
 /* break */
 breakst		:	BREAK			{ 
 									t_token *ret = new t_token();;
-									ret->token_str = ":break;\n"
-													+ $1->get_format_comment() + "\n"
-													+ "break\n";
+										ret->token_str = ":break;\n"
+														+ $1->get_format_comment() + "\n"
+														+ "break\n";
 									ret->comment = "";	/* コメントは消しておく */
 									$$ = ret; 
 								}
