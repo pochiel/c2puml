@@ -1,7 +1,7 @@
 # c2puml
 
 ## これは何？
-tranpile c source code to plant uml flow chart.
+transpile c source code to plant uml flow chart.
 
 Cのソースコードからフローチャートを直接出力可能なソフトを目指します。
 具体的には PlantUML 用のActivity図の .puml ファイルを出力します。
