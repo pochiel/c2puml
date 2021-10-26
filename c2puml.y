@@ -71,7 +71,7 @@ class t_token {
 %token<ctype> BRACE END_BRACE IF FOR WHILE EXPR ANY_OTHER ELSE FUNCTION ENDFUNCTION SWITCH CASE DEFAULT DO BREAK CONTINUE RETRN GOTO PROTOTYPE LABEL
 
 /* 非終端記号 */
-%type<ctype> program codes block ifst forst any_other functionst switchst casest case_set_expr block_member single_line_member dowhilest retrnst breakst gotost labelst
+%type<ctype> program codes block ifst forst any_other functionst switchst casest case_set_expr block_member single_line_member dowhilest retrnst breakst gotost labelst case_codes
 
 %start program
 
@@ -286,18 +286,48 @@ switchst	: SWITCH EXPR BRACE casest END_BRACE	 {
 case_set_expr : CASE EXPR							{
 														t_token *ret = new t_token();;
 														ret->token_str 	= 	"(" + $2->token_str + ")";
-														ret->comment		=	$1->comment;
+														ret->comment	=	$1->comment;
 														$$ = ret;
 													}
 			| case_set_expr CASE EXPR 				{
 														t_token *ret = new t_token();;
 														ret->token_str 	= 	"(" + $1->token_str + ") or (" + $3->token_str + ")";
-														ret->comment		=	$1->comment  + "\n" + $3->comment;
+														if( ($1->comment != "") && ($3->comment != "") ){
+															ret->comment	=	$1->comment  + "\n" + $3->comment;
+														} else {
+															ret->comment	=	$1->comment  + $3->comment;
+														}
 														$$ = ret;
 													}
 			;
-			
-casest		: case_set_expr codes					{
+
+case_codes	:	case_codes case_codes			{ $$ = new t_token(*$1 + *$2); }	
+			|	block							{ $$ = $1; }
+			|	ifst							{ $$ = $1; }
+			|	forst							{ $$ = $1; }
+			|	dowhilest						{ $$ = $1; }
+			|	any_other						{ $$ = $1; }
+			|	breakst							{ 
+													/* switch文の中に break を書くとバグるので
+														case処理の中の break は無視する */
+													t_token *ret = new t_token();;
+													ret->token_str = "";
+													ret->comment = "";
+													$$ = ret; 
+												}
+			|	CONTINUE						{
+													/* 暫定 */ 
+													t_token *ret = new t_token();;
+													ret->token_str = ":continue;\n";
+													$$ = ret; 
+												}
+			|	retrnst							{ $$ = $1; }
+			|	gotost							{ $$ = $1; }
+			|	switchst						{ $$ = $1; }
+			|	labelst							{ $$ = $1; }
+			;
+
+casest		: case_set_expr case_codes				{
 														t_token *ret = new t_token();;
 														ret->token_str = 	"elseif (" + $1->token_str + ") then (true)\n" 
 																			+ $1->get_format_comment() + "\n" 
@@ -305,7 +335,7 @@ casest		: case_set_expr codes					{
 														ret->comment = "";	/* コメントは消しておく */
 														$$ = ret;
 													}
-			| case_set_expr codes casest			{
+			| case_set_expr case_codes casest		{
 														t_token *ret = new t_token();;
 														ret->token_str = 	"elseif (" + $1->token_str + ") then (true)\n" 
 																			+ $1->get_format_comment() + "\n" 
@@ -314,7 +344,7 @@ casest		: case_set_expr codes					{
 														ret->comment = "";	/* コメントは消しておく */
 														$$ = ret;
 													}
-			| casest DEFAULT codes					{
+			| casest DEFAULT case_codes				{
 														t_token *ret = new t_token();;
 														ret->token_str = 	$1->token_str + "\n"
 																			+ "else\n"
@@ -323,7 +353,7 @@ casest		: case_set_expr codes					{
 														ret->comment = "";	/* コメントは消しておく */
 														$$ = ret;
 													}
-			| case_set_expr DEFAULT codes			{
+			| case_set_expr DEFAULT case_codes		{
 														t_token *ret = new t_token();;
 														ret->token_str = 	"elseif (" + $1->token_str + ") then (true)\n" 
 																			+ $1->get_format_comment() + "\n" 
