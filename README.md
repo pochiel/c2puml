@@ -5,6 +5,7 @@ Cのソースコードからフローチャートを直接出力可能なソフ�
 具体的には PlantUML 用のActivity図の .puml ファイルを出力します。
 
 （Cのソースとしては破綻してますが）一応下記のようなCっぽいソースコードからフローチャートを作れます。
+github を眺めて、そんなに長くないCのコードをいくつか変換してみましたが、そこそこいい感じに動くようになってきたっぽいです。
 
 ```
 #include <stdio.h>
@@ -62,5 +63,5 @@ int main(int argc, char *argv[])
 }
 ```
 
-![image](https://user-images.githubusercontent.com/2684586/130330675-f37a8a66-d4d0-46de-add9-ef71c8012751.png)
+![image](https://user-images.githubusercontent.com/2684586/138925914-e464ebc3-c696-43ee-9c44-f8f97639f66c.png)
 
