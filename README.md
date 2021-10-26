@@ -1,4 +1,6 @@
 # c2puml
+
+## これは何？
 tranpile c source code to plant uml flow chart.
 
 Cのソースコードからフローチャートを直接出力可能なソフトを目指します。
@@ -6,6 +8,8 @@ Cのソースコードからフローチャートを直接出力可能なソフ�
 
 （Cのソースとしては破綻してますが）一応下記のようなCっぽいソースコードからフローチャートを作れます。
 github を眺めて、そんなに長くないCのコードをいくつか変換してみましたが、そこそこいい感じに動くようになってきたっぽいです。
+やりたかったことが割とできるようになってきたので、更新ペースが落ちるかもです。
+何か問題があったら issue に報告ください。
 
 ```
 #include <stdio.h>
@@ -64,4 +68,15 @@ int main(int argc, char *argv[])
 ```
 
 ![image](https://user-images.githubusercontent.com/2684586/138925914-e464ebc3-c696-43ee-9c44-f8f97639f66c.png)
+
+
+## 使い方
+1.bison/flex をインストールします。（Windows環境なら、WSL Ubuntu上に apt-get install するのが吉）
+2.plantumlをインストールします。（java/graphviz も一緒に必要です。場合によっては plantuml web server を利用するのも吉）
+　http://www.plantuml.com/
+3.本リポジトリを clone し、make。
+4.下記コマンドで puml ファイルに変換します。
+　./c2puml -o [出力ファイル名] [入力ファイル名]
+ 　（ -o を指定しなければ、出力ファイルのデフォルト名は out.puml になります。）
+5.出力ファイルの plantumlコードをレンダリングします。
 
