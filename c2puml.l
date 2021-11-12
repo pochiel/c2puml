@@ -11,6 +11,7 @@ extern int yyparse();
 extern int yydebug;
 
 int g_bracket_cnt = 0;
+int g_struct_brachet_cnt = 0;
 
 /* ブロック情報保持スタック */
 typedef enum {
@@ -63,6 +64,7 @@ symbol      [=+\-\^*/();\n]
 letter      [_[:alpha:]][_[:alnum:]]*
 other       .
 other_cr	[[.]]
+all_of_char	[^\{\};]
 
 %x STRING
 %x CHARA
@@ -81,7 +83,7 @@ other_cr	[[.]]
 
 TYPE            void|char|int|float|double|short|long|signed|unsigned|sizeof
 STO_CLASS       extern|static|auto|register
-TYPEDEF         typedef|enum|struct|union
+TYPEDEF         typedef|enum|struct|union|class|public|private|protected
 CONTROL         if|else|for|while|do|switch|case|default|goto|return|break|continue
 TYPE_QUAL       const|volatile
 C_KEYWORDS      {TYPE}|{STO_CLASS}|{TYPEDEF}|{TYPE_QUAL}
@@ -105,7 +107,7 @@ TYPEID          typeid
 	*	責務：関数宣言を SET_YYLVAL し、return(FUNCTION)する 
 	******************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************/ %}
-({C_KEYWORDS}|{letter}|{white}|\*)*{white}*{letter}+{white}*\([^\(\)]*\)	{
+({C_KEYWORDS}|{letter}|{white}|\*)*{white}*{letter}+{white}*\({all_of_char}*\)	{
 												if(block_stack_index != 0) {
 													/* 関数宣言は stack 0 でのみ検出
 													（もうちょっとうまいやり方ないかなあ・・・） */
@@ -121,7 +123,7 @@ TYPEID          typeid
 %{  /*********************************************************************************
 	* プロトタイプ宣言
 	*/ %}
-({C_KEYWORDS}|{letter}|{white}|\*)*{white}*{letter}+{white}*\([^\(\)]*\){white}*;	{
+({C_KEYWORDS}|{letter}|{white}|\*)*{white}*{letter}+{white}*\({all_of_char}*\){white}*;	{
 												if(block_stack_index != 0) {
 													/* 関数宣言は stack 0 でのみ検出
 													（もうちょっとうまいやり方ないかなあ・・・） */
@@ -134,6 +136,14 @@ TYPEID          typeid
 											}
 
 %{  /*********************************************************************************
+	* 関数ポインタ型変数宣言
+	*/ %}
+({C_KEYWORDS}|{letter}|{white}|\*)*{white}*\(*{white}*\*{white}*{letter}+{white}*\({all_of_char}*\){white}*.*;	{
+												SET_YYLVAL(yytext);
+												return(ANY_OTHER);
+											}
+
+%{  /*********************************************************************************
 	* 構造体宣言など
 	*/ %}
 {TYPEDEF}+({TYPEDEF}|{white})*{white}*{letter}*{white}*\{							{
@@ -142,14 +152,21 @@ TYPEID          typeid
 													（もうちょっとうまいやり方ないかなあ・・・） */
 													REJECT;
 												} else {
+													g_struct_brachet_cnt++;
 													printf("[Info] struct def.\n");
 													BEGIN(ST_TYPEDEF); 
 												}
 }
 
+<ST_TYPEDEF>\{									{
+													g_struct_brachet_cnt++;
+												}
 <ST_TYPEDEF>\}+{white}*{letter}*{white}*;				{
+								g_struct_brachet_cnt--;
 								printf("[Info] struct def:\n%s", yytext);
-								BEGIN(INITIAL); 
+								if(g_struct_brachet_cnt==0){
+									BEGIN(INITIAL); 
+								}
 							}
 
 <ST_TYPEDEF>.				{
@@ -322,6 +339,7 @@ while{white}*\(				{
 								g_bracket_cnt--;
 								if(g_bracket_cnt == 0) {
 									BEGIN(INITIAL);
+									yytext[yyleng] = 0;
 									SET_YYLVAL(yytext);
 									return(EXPR);
 								} else {
