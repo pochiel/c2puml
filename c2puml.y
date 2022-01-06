@@ -11,6 +11,7 @@ void output_to_file(std::string &);
 void get_comment(std::string &buf);
 std::string get_connector(std::string orig_label) ;
 void clear_connector_list() ;
+std::string get_function_name(std::string function_def);
 
 uint32_t get_comment_index();
 #define YYDEBUG 1
@@ -86,8 +87,8 @@ program		:	functionst						{ $$ = $1; }
 
 /* ŠÖ”‚Æ‚Í‚È‚ñ‚¼‚â */
 functionst	:	FUNCTION BRACE codes END_BRACE	{
-														std::string output_str = "@startuml\n:"
-																					+ ($1->token_str) + ";\n" 
+														std::string output_str = "@startuml " + get_function_name($1->token_str) + "\n"
+																					+ ":" + ($1->token_str) + ";\n" 
 																					+ ($1->get_format_comment()) + "\n" 
 																					+ "start\n" 
 																					+ ($3->token_str) + "\n"
@@ -451,4 +452,8 @@ std::string get_connector(std::string orig_label) {
 void clear_connector_list() {
 	g_connector_map.clear();
 	connector_index=0;
+}
+
+std::string get_function_name(std::string function_def){
+	return std::regex_replace(function_def, std::regex("\\*"), "(asterisk)");;
 }
