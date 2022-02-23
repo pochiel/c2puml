@@ -2,13 +2,16 @@
 #include "parser.hpp"
 #include <string.h>
 #include <string>
+#include <regex>
 
 extern FILE * output_file_ptr;
 extern "C" int yylex();
 extern void set_comment(const std::string &com) ;
 extern void get_comment(std::string &buf);
 extern int yyparse();
+#ifdef DEBUGOUT
 extern int yydebug;
+#endif
 
 int g_bracket_cnt = 0;
 int g_struct_brachet_cnt = 0;
@@ -47,12 +50,12 @@ static int g_function_brace_cnt = 0;
 /* コメント格納辞書の現在の先頭index */
 
 // _b__buf__ は char *
-#define SET_YYLVAL(_b__buf__)	{							\
-	std::string temp;										\
-	get_comment(temp);										\
-	yylval.ctype = new t_token();							\
-	yylval.ctype->token_str = std::string(_b__buf__);		\
-	yylval.ctype->comment = temp;							\
+#define SET_YYLVAL(_b__buf__)	{																\
+	std::string temp;																			\
+	get_comment(temp);																			\
+	yylval.ctype = new t_token();																\
+	yylval.ctype->token_str = std::regex_replace(_b__buf__, std::regex("\n|\r\n|\r"), "");		\
+	yylval.ctype->comment = temp;																\
 }
 
 %}
@@ -79,6 +82,9 @@ all_of_char	[^\{\};]
 %x ST_RETRN_EXPR
 %x ST_GOTO_EXPR
 %x ST_TYPEDEF
+%x ST_GROBAL_ARRAY_INITIAL
+%x ST_FUNCTION
+%x ST_FUNC_EQUAL
 
 
 TYPE            void|char|int|float|double|short|long|signed|unsigned|sizeof
@@ -107,40 +113,38 @@ TYPEID          typeid
 	*	責務：関数宣言を SET_YYLVAL し、return(FUNCTION)する 
 	******************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************/ %}
-({C_KEYWORDS}|{letter}|{white}|\*)*{white}*{letter}+{white}*\({all_of_char}*\)	{
+	({C_KEYWORDS}|{letter}|{white}|\*)*{white}*{letter}+{white}*\({all_of_char}*\)	{
 												if(block_stack_index != 0) {
-													/* 関数宣言は stack 0 でのみ検出
-													（もうちょっとうまいやり方ないかなあ・・・） */
-													// printf("[Info] function def rejected.\n");
 													REJECT;
 												} else {
+													BEGIN(ST_FUNCTION);
 													SET_YYLVAL(yytext);
-													push_block_stack(C_BLOCK_TYPE_FUNCTION);
 													return(FUNCTION);
 												}
 											}
 
-%{  /*********************************************************************************
-	* プロトタイプ宣言
-	*/ %}
-({C_KEYWORDS}|{letter}|{white}|\*)*{white}*{letter}+{white}*\({all_of_char}*\){white}*;	{
-												if(block_stack_index != 0) {
-													/* 関数宣言は stack 0 でのみ検出
-													（もうちょっとうまいやり方ないかなあ・・・） */
-													// printf("[Info] prototype def rejected.\n");
-													REJECT;
-												} else {
-													// SET_YYLVAL(yytext);
-													// return(PROTOTYPE);
-												}
+<ST_FUNCTION>;								{
+												BEGIN(INITIAL);
+												return(SEMICOLON);
 											}
 
-%{  /*********************************************************************************
-	* 関数ポインタ型変数宣言
-	*/ %}
-({C_KEYWORDS}|{letter}|{white}|\*)*{white}*\(*{white}*\*{white}*{letter}+{white}*\({all_of_char}*\){white}*.*;	{
-												SET_YYLVAL(yytext);
-												return(ANY_OTHER);
+<ST_FUNCTION>=								{
+												BEGIN(ST_FUNC_EQUAL);
+												return(EQUAL);
+											}
+
+<ST_FUNC_EQUAL>\{							{
+												return(BRACE);
+											}
+<ST_FUNC_EQUAL>\}{white}*;					{
+												BEGIN(INITIAL);
+												return(END_BRACE);
+											}
+<ST_FUNCTION>\{								{
+												g_function_brace_cnt++;
+												BEGIN(INITIAL);
+												push_block_stack(C_BLOCK_TYPE_FUNCTION);
+												return(BRACE);
 											}
 
 %{  /*********************************************************************************
@@ -153,7 +157,7 @@ TYPEID          typeid
 													REJECT;
 												} else {
 													g_struct_brachet_cnt++;
-													printf("[Info] struct def.\n");
+													// printf("[Info] struct def.\n");
 													BEGIN(ST_TYPEDEF); 
 												}
 }
@@ -163,7 +167,7 @@ TYPEID          typeid
 												}
 <ST_TYPEDEF>\}+{white}*{letter}*{white}*;				{
 								g_struct_brachet_cnt--;
-								printf("[Info] struct def:\n%s", yytext);
+								//printf("[Info] struct def:\n%s", yytext);
 								if(g_struct_brachet_cnt==0){
 									BEGIN(INITIAL); 
 								}
@@ -198,7 +202,7 @@ if{white}*\(				{
 	*/ %}
 <ST_IF_EXPR>\(				{
 								g_bracket_cnt++;
-								printf("if bracket cnt=%d\n", g_bracket_cnt);
+								//printf("if bracket cnt=%d\n", g_bracket_cnt);
 								yymore();
 							}
 
@@ -209,14 +213,14 @@ if{white}*\(				{
 								g_bracket_cnt--;
 								if(g_bracket_cnt == 0) {
 									// if条件式検出完了
-									printf("bracket closed\n");
-									printf("if block\n");
+									//printf("bracket closed\n");
+									//printf("if block\n");
 
 									BEGIN(INITIAL);
 									SET_YYLVAL(yytext);
 									return(EXPR);
 								} else {
-									printf("bracke more g_bracket_cnt=%d", g_bracket_cnt);
+									//printf("bracke more g_bracket_cnt=%d", g_bracket_cnt);
 									yymore();
 								}
 							}
@@ -232,7 +236,7 @@ if{white}*\(				{
 	*  それ以外の文字。 if条件式を構成する文字であるため、普通に yymore() する。
 	*/ %}
 <ST_IF_EXPR>.  				{
-								printf("---------if text: %s", yytext);
+								//printf("---------if text: %s", yytext);
 								yymore();
 							}
 
@@ -467,7 +471,7 @@ default{white}*:		{
 
 %{  /*****************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************
-	* 二重カッコ {} 処理 blockの終端処理
+	* カギカッコ {} 処理 blockの終端処理
 	*	責務：現在の block_stack からpopし、閉じた block の種類に応じて適切な終端処理を行う
 	******************************************************************************************************************************************************************
 	******************************************************************************************************************************************************************/ %}
@@ -486,6 +490,11 @@ default{white}*:		{
 							}
 							SET_YYLVAL("");
 							return(END_BRACE);
+						}
+
+<ST_GROBAL_ARRAY_INITIAL>\}   {
+							BEGIN(INITIAL);
+							REJECT;
 						}
 
 %{  /*********************************************************************************
@@ -521,6 +530,11 @@ default{white}*:		{
 	*  それ以外の何かが入ってきた。
 	*/ %}
 <ST_ANY_OTHER>. {	yymore(); }
+
+%{  /*********************************************************************************
+	*  グローバルスコープで関数宣言初期化中
+	*/ %}
+<ST_GROBAL_ARRAY_INITIAL>.   { }
 
 %{  /*********************************************************************************
 	*  do の検出
@@ -626,7 +640,9 @@ int main(int argc, char *argv[])
     char output_filne_name[C_OUTPUT_FILE_MAX] = {0};
     char input_filne_name[C_OUTPUT_FILE_MAX] = {0};
 
-	yydebug = 1;
+#ifdef DEBUGOUT
+	yydebug = YYDEBUG;
+#endif
 
     /* default name. */
     strncpy(output_filne_name, "out.puml", C_OUTPUT_FILE_MAX);
