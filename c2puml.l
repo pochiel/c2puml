@@ -151,13 +151,12 @@ TYPEID          typeid
 %{  /*********************************************************************************
 	* 構造体宣言など
 	*/ %}
-{TYPEDEF}+({TYPEDEF}|{white})*{white}*{letter}*{white}*\{							{
+{TYPEDEF}+({TYPEDEF}|{white})*{white}*{letter}*{white}*							{
 												if(block_stack_index != 0) {
 													/* 構造体宣言は stack 0 でのみ検出
 													（もうちょっとうまいやり方ないかなあ・・・） */
 													REJECT;
 												} else {
-													g_struct_brachet_cnt++;
 													// printf("[Info] struct def.\n");
 													BEGIN(ST_TYPEDEF); 
 												}
