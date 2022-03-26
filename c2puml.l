@@ -151,7 +151,7 @@ TYPEID          typeid
 %{  /*********************************************************************************
 	* 構造体宣言など
 	*/ %}
-{TYPEDEF}+({TYPEDEF}|{white})*{white}*{letter}*{white}*							{
+({STO_CLASS}{white})*{TYPEDEF}+({TYPEDEF}|{white})*{white}*{letter}*{white}*							{
 												if(block_stack_index != 0) {
 													/* 構造体宣言は stack 0 でのみ検出
 													（もうちょっとうまいやり方ないかなあ・・・） */
@@ -167,7 +167,7 @@ TYPEID          typeid
 												}
 <ST_TYPEDEF>\}+{white}*{letter}*{white}*;				{
 								g_struct_brachet_cnt--;
-								//printf("[Info] struct def:\n%s", yytext);
+								//printf("g_struct_brachet_cnt==%d\n", g_struct_brachet_cnt);
 								if(g_struct_brachet_cnt==0){
 									BEGIN(INITIAL); 
 								}
